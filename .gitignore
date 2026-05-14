@@ -1,0 +1,42 @@
+# Build
+build/
+*.o
+*.a
+*.exe
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CMakeScratch/
+Testing/
+DartConfiguration.tcl
+compile_commands.json
+
+# MinGW/MSYS2
+*.dll
+*.exp
+*.lib
+*.pdb
+
+# Sisyphus workflow (internal)
+.sisyphus/run-continuation/
+.sisyphus/evidence/
+.sisyphus/drafts/
+
+# Temp
+*.log
+*.tmp
+
+# Windows
+Thumbs.db
+Desktop.ini
