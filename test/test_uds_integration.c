@@ -72,6 +72,7 @@ typedef struct {
 
 static sim_context_t        g_sim_ctx;
 static uds_svc_stored_ctx_t g_stored_ctx;
+static lin_transport_ctx_t *g_lin_ctx;
 
 /* ======================================================================== *
  * Helper — Select context per SID                                         *
@@ -161,7 +162,7 @@ static int round_trip_uds(const uint8_t *uds_req_data, uint16_t uds_req_len,
 
     uint8_t     tx_req_count = 0;
     lin_frame_t tx_req_frames[8];
-    lin_status_t lin_st = lin_tx_encode(&tx_req_pdu, tx_req_frames,
+    lin_status_t lin_st = lin_tx_encode_ctx(g_lin_ctx, &tx_req_pdu, tx_req_frames,
                                          &tx_req_count, 8);
     TEST_ASSERT_EQUAL(LIN_OK, lin_st);
     TEST_ASSERT(tx_req_count >= 1);
@@ -178,7 +179,7 @@ static int round_trip_uds(const uint8_t *uds_req_data, uint16_t uds_req_len,
                                                LIN_FRAME_SIZE, 0);
         TEST_ASSERT_EQUAL(HAL_OK, rx_st);
 
-        lin_st = lin_rx_decode(&rx_frame, &rx_pdu);
+        lin_st = lin_rx_decode_ctx(g_lin_ctx, &rx_frame, &rx_pdu);
         TEST_ASSERT_EQUAL(LIN_OK, lin_st);
     }
 
@@ -257,7 +258,7 @@ static int round_trip_uds_ex(const uint8_t *uds_req_data, uint16_t uds_req_len,
 
     uint8_t     tx_req_count = 0;
     lin_frame_t tx_req_frames[8];
-    lin_status_t lin_st = lin_tx_encode(&tx_req_pdu, tx_req_frames,
+    lin_status_t lin_st = lin_tx_encode_ctx(g_lin_ctx, &tx_req_pdu, tx_req_frames,
                                          &tx_req_count, 8);
     TEST_ASSERT_EQUAL(LIN_OK, lin_st);
     TEST_ASSERT(tx_req_count >= 1);
@@ -274,7 +275,7 @@ static int round_trip_uds_ex(const uint8_t *uds_req_data, uint16_t uds_req_len,
                                                LIN_FRAME_SIZE, 0);
         TEST_ASSERT_EQUAL(HAL_OK, rx_st);
 
-        lin_st = lin_rx_decode(&rx_frame, &rx_pdu);
+        lin_st = lin_rx_decode_ctx(g_lin_ctx, &rx_frame, &rx_pdu);
         TEST_ASSERT_EQUAL(LIN_OK, lin_st);
     }
 
@@ -374,7 +375,7 @@ void setUp(void)
     (void)hal_uart_init(19200);
     hal_timer_init();
 
-    lin_transport_reset();
+    g_lin_ctx = lin_create_ctx(LIN_NAD_DEFAULT);
     uds_session_init(&g_sim_ctx.session);
     uds_security_init();
     uds_dtc_init();
@@ -392,6 +393,8 @@ void setUp(void)
 
 void tearDown(void)
 {
+    lin_free_ctx(g_lin_ctx);
+    g_lin_ctx = NULL;
 }
 
 /* ======================================================================== *

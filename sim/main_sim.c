@@ -67,6 +67,7 @@ static sim_context_t        g_sim_ctx;
 
 /** @brief Stored context for 0x14 (ClearDiagnosticInformation) */
 static uds_svc_stored_ctx_t g_stored_ctx;
+static lin_transport_ctx_t *g_lin_ctx;
 
 /* ======================================================================== *
  * Helper: Select the dispatch context pointer for a given SID              *
@@ -164,7 +165,7 @@ static void sim_init(void)
     hal_timer_init();
 
     /* --- Transport --- */
-    lin_transport_reset();
+    g_lin_ctx = lin_create_ctx(SIM_LIN_NAD);
 
     /* --- Session --- */
     uds_session_init(&g_sim_ctx.session);
@@ -221,7 +222,7 @@ static int process_lin_frame(const lin_frame_t *rx_frame)
     uds_status_t    st;
 
     /* ---- 1. Decode LIN frame -> PDU ---- */
-    lin_status_t lin_st = lin_rx_decode(rx_frame, &rx_pdu);
+    lin_status_t lin_st = lin_rx_decode_ctx(g_lin_ctx, rx_frame, &rx_pdu);
     if (lin_st != LIN_OK)
     {
         fprintf(stderr, "[SIM] lin_rx_decode failed: %d\n", (int)lin_st);
@@ -286,7 +287,7 @@ static int process_lin_frame(const lin_frame_t *rx_frame)
     lin_frame_t tx_frames[8];
     uint8_t     tx_count = 0;
 
-    lin_st = lin_tx_encode(&tx_pdu, tx_frames, &tx_count, 8);
+    lin_st = lin_tx_encode_ctx(g_lin_ctx, &tx_pdu, tx_frames, &tx_count, 8);
     if (lin_st != LIN_OK)
     {
         fprintf(stderr, "[SIM] lin_tx_encode failed: %d\n", (int)lin_st);
@@ -370,5 +371,6 @@ int main(void)
     printf("========================================\n");
     printf("[SIM] Simulator shut down.\n");
 
+    lin_free_ctx(g_lin_ctx);
     return 0;
 }

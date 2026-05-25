@@ -17,15 +17,17 @@
 /** @brief An alternate NAD for mismatch testing */
 #define ALT_NAD    0x7F
 
+static lin_transport_ctx_t *g_ctx;
+
 void setUp(void)
 {
-    /* Reset transport state before each test */
-    lin_transport_reset();
+    g_ctx = lin_create_ctx(TEST_NAD);
 }
 
 void tearDown(void)
 {
-    /* Called after each test */
+    lin_free_ctx(g_ctx);
+    g_ctx = NULL;
 }
 
 /* ======================================================================== *
@@ -52,7 +54,7 @@ void test_sf_encode(void)
     uint8_t frame_count = 0;
 
     /* Test data_len ≤ LIN_SF_MAX_LEN (6) */
-    lin_status_t status = lin_tx_encode(&pdu, frames, &frame_count, 8);
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 8);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(1, frame_count);
 
@@ -83,7 +85,7 @@ void test_sf_encode_max_len(void)
     lin_frame_t frames[8];
     uint8_t frame_count = 0;
 
-    lin_status_t status = lin_tx_encode(&pdu, frames, &frame_count, 8);
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 8);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(1, frame_count);
     TEST_ASSERT_EQUAL_UINT8(LIN_PCI_SF | 6, frames[0].data[1]);
@@ -100,7 +102,7 @@ void test_sf_encode_min_len(void)
     lin_frame_t frames[8];
     uint8_t frame_count = 0;
 
-    lin_status_t status = lin_tx_encode(&pdu, frames, &frame_count, 8);
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 8);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(1, frame_count);
     TEST_ASSERT_EQUAL_UINT8(LIN_PCI_SF | 1, frames[0].data[1]);
@@ -120,7 +122,7 @@ void test_nad_mismatch(void)
     frame.data[3] = 0x03;
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_NAD_MISMATCH, status);
 }
 
@@ -138,7 +140,7 @@ void test_decode_valid_sf(void)
     frame.data[4] = 0xAA;                        /* UDS data byte 2 */
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(TEST_NAD, pdu.nad);
     TEST_ASSERT_EQUAL_UINT8(LIN_PCI_SF | 3, pdu.pci);
@@ -160,7 +162,7 @@ void test_decode_sf_zero_len(void)
     frame.data[1] = LIN_PCI_SF | 0;   /* SF with 0-length payload */
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(0, pdu.data_len);
 }
@@ -177,7 +179,7 @@ void test_multi_frame_encode(void)
     lin_frame_t frames[8];
     uint8_t frame_count = 0;
 
-    lin_status_t status = lin_tx_encode(&pdu, frames, &frame_count, 8);
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 8);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(2, frame_count);
 
@@ -224,7 +226,7 @@ void test_multi_frame_encode_three_frames(void)
     lin_frame_t frames[8] = {{{0}}};  /* zero-initialize to avoid stale stack data */
     uint8_t frame_count = 0;
 
-    lin_status_t status = lin_tx_encode(&pdu, frames, &frame_count, 8);
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 8);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(3, frame_count);
 
@@ -264,7 +266,7 @@ void test_multi_frame_decode(void)
     ff.data[7] = 0x44;                       /* UDS data byte 4 */
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&ff, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &ff, &pdu);
 
     /* FF accepted — partial data in PDU */
     TEST_ASSERT_EQUAL(LIN_OK, status);
@@ -282,7 +284,7 @@ void test_multi_frame_decode(void)
     cf.data[5] = 0x88;                       /* UDS data byte 8 */
     cf.data[6] = 0x99;                       /* UDS data byte 9 */
 
-    status = lin_rx_decode(&cf, &pdu);
+    status = lin_rx_decode_ctx(g_ctx, &cf, &pdu);
 
     /* Complete multi-frame received */
     TEST_ASSERT_EQUAL(LIN_OK, status);
@@ -306,7 +308,7 @@ void test_invalid_pci_type(void)
     frame.data[2] = 0x10;
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
 }
 
@@ -322,7 +324,7 @@ void test_sf_invalid_length(void)
     frame.data[2] = 0x10;
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
 }
 
@@ -338,7 +340,7 @@ void test_ff_invalid_length(void)
     frame.data[2] = 0x05;   /* total_len = 5, which fits in SF → invalid for FF */
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
 }
 
@@ -353,7 +355,7 @@ void test_cf_without_ff(void)
     frame.data[1] = LIN_PCI_CF | 1;   /* CF seq=1, but no FF received */
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
 }
 
@@ -375,7 +377,7 @@ void test_cf_wrong_sequence(void)
     ff.data[7] = 0x05;
 
     lin_diag_pdu_t pdu;
-    lin_rx_decode(&ff, &pdu);
+    lin_rx_decode_ctx(g_ctx, &ff, &pdu);
 
     /* Now send CF with wrong sequence (expect 1, send 3) */
     lin_frame_t cf;
@@ -388,7 +390,7 @@ void test_cf_wrong_sequence(void)
     cf.data[5] = 0x09;
     cf.data[6] = 0x0A;
 
-    lin_status_t status = lin_rx_decode(&cf, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &cf, &pdu);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
 }
 
@@ -404,25 +406,25 @@ void test_null_inputs(void)
 
     /* NULL pdu pointer */
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR,
-        lin_tx_encode(NULL, frames, &frame_count, 4));
+        lin_tx_encode_ctx(g_ctx, NULL, frames, &frame_count, 4));
 
     /* NULL frames pointer */
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR,
-        lin_tx_encode(&pdu, NULL, &frame_count, 4));
+        lin_tx_encode_ctx(g_ctx, &pdu, NULL, &frame_count, 4));
 
     /* NULL frame_count pointer */
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR,
-        lin_tx_encode(&pdu, frames, NULL, 4));
+        lin_tx_encode_ctx(g_ctx, &pdu, frames, NULL, 4));
 
     /* NULL frame pointer (rx) */
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR,
-        lin_rx_decode(NULL, &pdu));
+        lin_rx_decode_ctx(g_ctx, NULL, &pdu));
 
     /* NULL pdu pointer (rx) */
     lin_frame_t frame;
     (void)memset(frame.data, 0, sizeof(frame.data));
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR,
-        lin_rx_decode(&frame, NULL));
+        lin_rx_decode_ctx(g_ctx, &frame, NULL));
 }
 
 /* ======================================================================== *
@@ -439,7 +441,7 @@ void test_zero_length_encode(void)
     lin_frame_t frames[4];
     uint8_t frame_count = 0;
 
-    lin_status_t status = lin_tx_encode(&pdu, frames, &frame_count, 4);
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 4);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
 }
 
@@ -461,10 +463,10 @@ void test_reset_clears_state(void)
     ff.data[7] = 0x05;
 
     lin_diag_pdu_t pdu;
-    lin_rx_decode(&ff, &pdu);  /* Should transition to RX_CF */
+    lin_rx_decode_ctx(g_ctx, &ff, &pdu);  /* Should transition to RX_CF */
 
     /* Now reset */
-    lin_transport_reset();
+    lin_transport_reset_ctx(g_ctx);
 
     /* CF without FF (after reset) should now fail */
     lin_frame_t cf;
@@ -473,7 +475,7 @@ void test_reset_clears_state(void)
     cf.data[1] = LIN_PCI_CF | 1;
     cf.data[2] = 0x06;
 
-    lin_status_t status = lin_rx_decode(&cf, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &cf, &pdu);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);  /* no FF state to match */
 
     /* TX encode should still work normally after reset */
@@ -481,7 +483,7 @@ void test_reset_clears_state(void)
     lin_diag_pdu_t pdu2 = make_pdu(TEST_NAD, payload, sizeof(payload));
     lin_frame_t frames[4];
     uint8_t frame_count = 0;
-    status = lin_tx_encode(&pdu2, frames, &frame_count, 4);
+    status = lin_tx_encode_ctx(g_ctx, &pdu2, frames, &frame_count, 4);
     TEST_ASSERT_EQUAL(LIN_OK, status);
     TEST_ASSERT_EQUAL_UINT8(1, frame_count);
 }
@@ -503,7 +505,7 @@ void test_ff_exceeds_max_length(void)
     frame.data[2] = 0x00;                 /* 0x1000 = 4096 */
 
     lin_diag_pdu_t pdu;
-    lin_status_t status = lin_rx_decode(&frame, &pdu);
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
     TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
 }
 
