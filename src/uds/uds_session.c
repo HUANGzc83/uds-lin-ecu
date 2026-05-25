@@ -9,6 +9,7 @@
  */
 
 #include "uds/uds_session.h"
+#include <stddef.h>
 
 /* ======================================================================== *
  * Session Parameter Table                                                   *
