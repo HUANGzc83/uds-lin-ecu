@@ -302,7 +302,7 @@ void test_invalid_pci_type(void)
     lin_frame_t frame;
     (void)memset(frame.data, 0, sizeof(frame.data));
     frame.data[0] = TEST_NAD;
-    frame.data[1] = 0x60 | 2;   /* PCI type = 0x60 (unused type 3), not SF/FF/CF */
+    frame.data[1] = 0x80 | 2;   /* PCI type = 0x80 (invalid — only types 0-3 defined) */
     frame.data[2] = 0x10;
 
     lin_diag_pdu_t pdu;

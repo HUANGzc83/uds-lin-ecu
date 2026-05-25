@@ -429,6 +429,7 @@ typedef struct {
     const uint8_t *tx_stream_data;          /**< @brief Remaining data pointer for CF generation */
     uint16_t       tx_stream_remaining;     /**< @brief Remaining data length for streaming TX */
     bool           tx_stream_active;        /**< @brief Streaming transmission active flag */
+    uint8_t        tx_stream_buf[LIN_FF_MAX_LEN]; /**< @brief Internal copy of streaming payload (avoids dangling pointer) */
 
     /* --- Callbacks --- */
     lin_send_frame_fn_t send_frame_cb;      /**< @brief Callback for sending LIN frames */
@@ -437,6 +438,66 @@ typedef struct {
     uint32_t last_tx_time;                  /**< @brief Last TX timestamp (ms) for timeout tracking */
     uint32_t last_rx_time;                  /**< @brief Last RX timestamp (ms) for timeout tracking */
 } lin_transport_ctx_t;
+
+/* ======================================================================== *
+ * Multi-Instance API (ctx-parameter variants)                               *
+ * ======================================================================== *
+ * Each function below is the reentrant version that accepts an explicit
+ * lin_transport_ctx_t* as its first parameter.  The original functions
+ * (declared above) are backward-compatible wrappers that delegate to
+ * these using an internal default context.
+ * ======================================================================== */
+
+lin_status_t lin_tx_encode_ctx(lin_transport_ctx_t *ctx,
+                               const lin_diag_pdu_t *pdu,
+                               lin_frame_t *frames,
+                               uint8_t *frame_count,
+                               uint8_t max_frames);
+
+lin_status_t lin_rx_decode_ctx(lin_transport_ctx_t *ctx,
+                               const lin_frame_t *frame,
+                               lin_diag_pdu_t *pdu);
+
+void lin_transport_reset_ctx(lin_transport_ctx_t *ctx);
+
+void lin_transport_set_nad_ctx(lin_transport_ctx_t *ctx, uint8_t nad);
+
+void lin_transport_set_accept_functional_ctx(lin_transport_ctx_t *ctx, bool enable);
+
+lin_status_t lin_tx_encode_fc_ctx(lin_transport_ctx_t *ctx,
+                                  uint8_t nad,
+                                  const lin_fc_params_t *params,
+                                  lin_frame_t *frame);
+
+void lin_transport_get_fc_params_ctx(lin_transport_ctx_t *ctx,
+                                     lin_fc_params_t *params);
+
+void lin_transport_set_fc_params_ctx(lin_transport_ctx_t *ctx,
+                                     uint8_t stmin, uint8_t bs);
+
+bool lin_transport_check_timeout_ctx(lin_transport_ctx_t *ctx,
+                                     uint8_t timeout_type,
+                                     uint32_t current_time);
+
+void lin_transport_record_tx_time_ctx(lin_transport_ctx_t *ctx,
+                                      uint32_t tx_time);
+
+void lin_transport_record_rx_time_ctx(lin_transport_ctx_t *ctx,
+                                      uint32_t rx_time);
+
+void lin_transport_register_send_callback_ctx(lin_transport_ctx_t *ctx,
+                                              lin_send_frame_fn_t cb);
+
+lin_status_t lin_tx_begin_stream_ctx(lin_transport_ctx_t *ctx,
+                                     const lin_diag_pdu_t *pdu,
+                                     lin_frame_t *ff_out);
+
+bool lin_tx_next_cf_ctx(lin_transport_ctx_t *ctx,
+                        lin_frame_t *cf_out);
+
+bool lin_tx_has_more_ctx(lin_transport_ctx_t *ctx);
+
+void lin_tx_abort_stream_ctx(lin_transport_ctx_t *ctx);
 
 /**
  * @brief Create a LIN transport context from the static pool.
