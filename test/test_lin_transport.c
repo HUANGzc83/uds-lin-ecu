@@ -510,6 +510,250 @@ void test_ff_exceeds_max_length(void)
 }
 
 /* ======================================================================== *
+ * SF max 6 bytes — border of single-frame, encode + decode                 *
+ * ======================================================================== */
+void test_multi_frame_sf_max_6_bytes(void)
+{
+    /* --- Encode: 6 bytes should produce SF, not FF --- */
+    const uint8_t payload[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    lin_diag_pdu_t pdu = make_pdu(TEST_NAD, payload, sizeof(payload));
+    lin_frame_t frames[4];
+    uint8_t frame_count = 0;
+
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 4);
+    TEST_ASSERT_EQUAL(LIN_OK, status);
+    TEST_ASSERT_EQUAL_UINT8(1, frame_count);
+    TEST_ASSERT_EQUAL_UINT8(LIN_PCI_SF | 6, frames[0].data[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xFF, frames[0].data[7]);
+
+    /* --- Decode: SF with exactly 6 bytes --- */
+    lin_frame_t sf;
+    (void)memset(sf.data, 0, sizeof(sf.data));
+    sf.data[0] = TEST_NAD;
+    sf.data[1] = LIN_PCI_SF | 6;
+    sf.data[2] = 0x11;
+    sf.data[3] = 0x22;
+    sf.data[4] = 0x33;
+    sf.data[5] = 0x44;
+    sf.data[6] = 0x55;
+    sf.data[7] = 0x66;
+
+    lin_diag_pdu_t decoded;
+    status = lin_rx_decode_ctx(g_ctx, &sf, &decoded);
+    TEST_ASSERT_EQUAL(LIN_OK, status);
+    TEST_ASSERT_EQUAL_UINT8(6, decoded.data_len);
+    TEST_ASSERT_EQUAL_UINT8(0x66, decoded.uds_data[5]);
+}
+
+/* ======================================================================== *
+ * FF min 7 bytes — minimum multi-frame boundary                            *
+ * ======================================================================== */
+void test_multi_frame_ff_min_7_bytes(void)
+{
+    /* Exactly 7 bytes: FF carries 5, CF carries 2 → 2 frames */
+    const uint8_t payload[] = {0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6};
+    lin_diag_pdu_t pdu = make_pdu(TEST_NAD, payload, sizeof(payload));
+    lin_frame_t frames[4] = {{{0}}};
+    uint8_t frame_count = 0;
+
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 4);
+    TEST_ASSERT_EQUAL(LIN_OK, status);
+    TEST_ASSERT_EQUAL_UINT8(2, frame_count);
+
+    /* FF: PCI with total_len=7 */
+    TEST_ASSERT_EQUAL_UINT8(LIN_PCI_FF | 0x00, frames[0].data[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x07, frames[0].data[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xA0, frames[0].data[3]);
+    TEST_ASSERT_EQUAL_UINT8(0xA4, frames[0].data[7]);
+
+    /* CF: seq=1, carries remaining 2 bytes */
+    TEST_ASSERT_EQUAL_UINT8(LIN_PCI_CF | 1, frames[1].data[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xA5, frames[1].data[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xA6, frames[1].data[3]);
+    TEST_ASSERT_EQUAL_UINT8(0,    frames[1].data[4]);  /* unused */
+}
+
+/* ======================================================================== *
+ * FF exact 5 bytes — decode: FF with exactly 5-byte payload (total=7)      *
+ * ======================================================================== */
+void test_multi_frame_ff_exact_5_bytes(void)
+{
+    uint8_t expected[] = {0x10, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+
+    /* --- Send First Frame with total_len=7 (minimum valid FF) --- */
+    lin_frame_t ff;
+    (void)memset(ff.data, 0, sizeof(ff.data));
+    ff.data[0] = TEST_NAD;
+    ff.data[1] = LIN_PCI_FF | 0x00;
+    ff.data[2] = 0x07;       /* total_len = 7 */
+    ff.data[3] = 0x10;
+    ff.data[4] = 0x11;
+    ff.data[5] = 0x22;
+    ff.data[6] = 0x33;
+    ff.data[7] = 0x44;
+
+    lin_diag_pdu_t pdu;
+    lin_status_t status = lin_rx_decode_ctx(g_ctx, &ff, &pdu);
+    TEST_ASSERT_EQUAL(LIN_OK, status);
+    TEST_ASSERT_EQUAL_UINT8(5, pdu.data_len);  /* FF carries 5 bytes */
+
+    /* --- Send Consecutive Frame with remaining 2 bytes --- */
+    lin_frame_t cf;
+    (void)memset(cf.data, 0, sizeof(cf.data));
+    cf.data[0] = TEST_NAD;
+    cf.data[1] = LIN_PCI_CF | 1;
+    cf.data[2] = 0x55;
+    cf.data[3] = 0x66;
+
+    status = lin_rx_decode_ctx(g_ctx, &cf, &pdu);
+    TEST_ASSERT_EQUAL(LIN_OK, status);
+    TEST_ASSERT_EQUAL_UINT8(7, pdu.data_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, pdu.uds_data, 7);
+}
+
+/* ======================================================================== *
+ * CF sequence wrap — 100-byte payload → 16 CFs, seq 1..15→1               *
+ * ======================================================================== */
+void test_multi_frame_cf_seq_wrap(void)
+{
+    /* 100 bytes: FF(5) + CF×16(15×6 + 1×5) = 17 frames */
+    static uint8_t payload[100];
+    uint8_t i;
+    for (i = 0; i < 100; i++) {
+        payload[i] = i;
+    }
+
+    lin_diag_pdu_t pdu = make_pdu(TEST_NAD, payload, 100);
+    static lin_frame_t frames[20];
+    uint8_t frame_count = 0;
+
+    lin_status_t status = lin_tx_encode_ctx(g_ctx, &pdu, frames, &frame_count, 20);
+    TEST_ASSERT_EQUAL(LIN_OK, status);
+    TEST_ASSERT_EQUAL_UINT8(17, frame_count);
+
+    /* FF: total_len = 100 = 0x0064 */
+    TEST_ASSERT_EQUAL_UINT8(LIN_PCI_FF | 0x00, frames[0].data[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x64, frames[0].data[2]);
+
+    /* CF1..CF15: seq 1..15, each carries 6 bytes */
+    for (i = 0; i < 15; i++) {
+        uint8_t expected_seq = (uint8_t)((i % 15) + 1);
+        TEST_ASSERT_EQUAL_UINT8(LIN_PCI_CF | expected_seq, frames[1 + i].data[1]);
+    }
+
+    /* CF16: seq wraps to 1, carries last 5 bytes */
+    TEST_ASSERT_EQUAL_UINT8(LIN_PCI_CF | 1, frames[16].data[1]);
+    TEST_ASSERT_EQUAL_UINT8(95,  frames[16].data[2]); /* offset 95 */
+    TEST_ASSERT_EQUAL_UINT8(99,  frames[16].data[6]); /* offset 99, last byte */
+}
+
+/* ======================================================================== *
+ * Max payload 4095 bytes — verify boundary and buffer management           *
+ * ======================================================================== */
+void test_multi_frame_max_4095_bytes(void)
+{
+    lin_status_t status;
+
+    /* Boundary: Encode must reject data_len=4096 */
+    {
+        static uint8_t buf[8];
+        lin_diag_pdu_t big;
+        big.nad      = TEST_NAD;
+        big.pci      = 0;
+        big.uds_data = buf;
+        big.data_len = 4096;
+        lin_frame_t frames[4];
+        uint8_t frame_count = 0;
+        status = lin_tx_encode_ctx(g_ctx, &big, frames, &frame_count, 4);
+        TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
+    }
+
+    /* Boundary: FF decode total_len=4096 rejected */
+    {
+        lin_frame_t frame;
+        lin_diag_pdu_t pdu;
+        (void)memset(frame.data, 0, sizeof(frame.data));
+        frame.data[0] = TEST_NAD;
+        frame.data[1] = LIN_PCI_FF | 0x10;
+        frame.data[2] = 0x00;
+        frame.data[3] = 0x01;
+        status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
+        TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
+    }
+
+    /* Boundary: FF decode total_len=4095 accepted → verifies rx_buffer size */
+    {
+        lin_frame_t frame;
+        lin_diag_pdu_t pdu;
+        (void)memset(frame.data, 0, sizeof(frame.data));
+        frame.data[0] = TEST_NAD;
+        frame.data[1] = LIN_PCI_FF | 0x0F;
+        frame.data[2] = 0xFF;
+        frame.data[3] = 0x01;
+        frame.data[4] = 0x02;
+        frame.data[5] = 0x03;
+        frame.data[6] = 0x04;
+        frame.data[7] = 0x05;
+        status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
+        TEST_ASSERT_EQUAL(LIN_OK, status);
+        TEST_ASSERT_EQUAL_UINT8(5, pdu.data_len);
+    }
+
+    /* Scale: encode 260-byte payload → 44 frames (safe range, avoids uint8_t wraparound) */
+    {
+        static uint8_t large_payload[260];
+        uint16_t i;
+        for (i = 0; i < 260; i++) {
+            large_payload[i] = (uint8_t)(i & 0xFF);
+        }
+        lin_diag_pdu_t big;
+        big.nad      = TEST_NAD;
+        big.pci      = 0;
+        big.uds_data = large_payload;
+        big.data_len = 260;
+        static lin_frame_t frames[48];
+        uint8_t frame_count = 0;
+
+        status = lin_tx_encode_ctx(g_ctx, &big, frames, &frame_count, 48);
+        TEST_ASSERT_EQUAL(LIN_OK, status);
+        /* FF(1) + CFs: 255 bytes / 6 = 42 rem 3 → 43 CFs → 44 total */
+        TEST_ASSERT_EQUAL_UINT8(44, frame_count);
+
+        /* FF: 260 = 0x0104 → PCI high nibble = 0x01, low byte = 0x04 */
+        TEST_ASSERT_EQUAL_UINT8(LIN_PCI_FF | 0x01, frames[0].data[1]);
+        TEST_ASSERT_EQUAL_UINT8(0x04, frames[0].data[2]);
+
+        /* Last CF (index 43): seq = (42%15)+1 = 13, carries last 3 bytes */
+        TEST_ASSERT_EQUAL_UINT8(LIN_PCI_CF | 13, frames[43].data[1]);
+        TEST_ASSERT_EQUAL_UINT8(0x01, frames[43].data[2]); /* payload[257] = 257 & 0xFF = 1 */
+        TEST_ASSERT_EQUAL_UINT8(0x03, frames[43].data[4]); /* payload[259] = 259 & 0xFF = 3 */
+    }
+}
+
+/* ======================================================================== *
+ * Invalid PCI type — reject all undefined upper PCI types                  *
+ * ======================================================================== */
+void test_lin_rx_decode_invalid_pci(void)
+{
+    /* Valid types: 0x00 (SF), 0x20 (FF), 0x40 (CF), 0x60 (FC)
+     * Invalid types: 0x80, 0xA0, 0xC0, 0xE0 */
+    static const uint8_t invalid_types[] = {0x80, 0xA0, 0xC0, 0xE0};
+    uint8_t i;
+
+    for (i = 0; i < sizeof(invalid_types); i++) {
+        lin_frame_t frame;
+        (void)memset(frame.data, 0, sizeof(frame.data));
+        frame.data[0] = TEST_NAD;
+        frame.data[1] = invalid_types[i] | 2;
+        frame.data[2] = 0x10;
+
+        lin_diag_pdu_t pdu;
+        lin_status_t status = lin_rx_decode_ctx(g_ctx, &frame, &pdu);
+        TEST_ASSERT_EQUAL(LIN_PCI_ERROR, status);
+    }
+}
+
+/* ======================================================================== *
  * Test runner                                                               *
  * ======================================================================== */
 int main(void)
@@ -547,6 +791,14 @@ int main(void)
 
     /* --- State management --- */
     RUN_TEST(test_reset_clears_state);
+
+    /* --- Boundary / edge-case tests (Task 16) --- */
+    RUN_TEST(test_multi_frame_sf_max_6_bytes);
+    RUN_TEST(test_multi_frame_ff_min_7_bytes);
+    RUN_TEST(test_multi_frame_ff_exact_5_bytes);
+    RUN_TEST(test_multi_frame_cf_seq_wrap);
+    RUN_TEST(test_multi_frame_max_4095_bytes);
+    RUN_TEST(test_lin_rx_decode_invalid_pci);
 
     return UNITY_END();
 }

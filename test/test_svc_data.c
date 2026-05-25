@@ -347,6 +347,74 @@ void test_3d_invalid_address(void)
 }
 
 /* ======================================================================== *
+ * DID read response overflow — DID len=255 overflows 256-byte buffer       *
+ * ======================================================================== */
+void test_read_data_by_id_response_overflow(void)
+{
+    /* Register a DID with 255 bytes — response needs DID(2) + data(255) = 257 > 256 */
+    static uint8_t did_storage_overflow[255];
+    {
+        uds_did_entry_t entry;
+        memset(&entry, 0, sizeof(entry));
+        entry.did      = 0xBEEF;
+        entry.len      = 255;
+        entry.access   = DID_READ_WRITE;
+        entry.data     = did_storage_overflow;
+        TEST_ASSERT_TRUE(uds_did_register(&entry));
+    }
+
+    /* Fill with pattern */
+    uint16_t i;
+    for (i = 0; i < 255; i++) {
+        did_storage_overflow[i] = (uint8_t)(i & 0xFF);
+    }
+
+    /* Read the 255-byte DID — should fail with NRC_RESPONSE_TOO_LONG */
+    {
+        uds_response_t rsp;
+        uint8_t raw[] = {0x22, 0xBE, 0xEF};
+        bool result = call_handler(raw, sizeof(raw), &rsp, &unlocked,
+                                   uds_svc_read_data_by_id);
+        TEST_ASSERT_TRUE(result);
+        TEST_ASSERT_EQUAL_UINT8(0x7F, rsp.sid);
+        TEST_ASSERT_EQUAL_UINT8(0x22, rsp.subfunc_echo);
+        TEST_ASSERT_EQUAL_UINT8(1, rsp.data_len);
+        TEST_ASSERT_EQUAL_UINT8(NRC_RESPONSE_TOO_LONG, rsp.data[0]);
+    }
+
+    /* Register a DID with 254 bytes — response fits exactly: 2 + 254 = 256 */
+    static uint8_t did_storage_fit[254];
+    {
+        uds_did_entry_t entry;
+        memset(&entry, 0, sizeof(entry));
+        entry.did      = 0xCAFE;
+        entry.len      = 254;
+        entry.access   = DID_READ_WRITE;
+        entry.data     = did_storage_fit;
+        TEST_ASSERT_TRUE(uds_did_register(&entry));
+    }
+
+    for (i = 0; i < 254; i++) {
+        did_storage_fit[i] = (uint8_t)((i + 1) & 0xFF);
+    }
+
+    /* Read the 254-byte DID — should succeed */
+    {
+        uds_response_t rsp;
+        uint8_t raw[] = {0x22, 0xCA, 0xFE};
+        bool result = call_handler(raw, sizeof(raw), &rsp, &unlocked,
+                                   uds_svc_read_data_by_id);
+        TEST_ASSERT_TRUE(result);
+        TEST_ASSERT_EQUAL_UINT8(READ_DATA_BY_IDENTIFIER_RSP, rsp.sid);
+        TEST_ASSERT_EQUAL_UINT16(256, rsp.data_len);
+        TEST_ASSERT_EQUAL_UINT8(0xCA, rsp.data[0]);
+        TEST_ASSERT_EQUAL_UINT8(0xFE, rsp.data[1]);
+        TEST_ASSERT_EQUAL_UINT8(0x01, rsp.data[2]);  /* first data byte */
+        TEST_ASSERT_EQUAL_UINT8(0xFE, rsp.data[255]); /* last data byte (1+253 = 254 = 0xFE) */
+    }
+}
+
+/* ======================================================================== *
  * Test Runner                                                              *
  * ======================================================================== */
 
@@ -373,5 +441,6 @@ int main(void)
     RUN_TEST(test_2e_null_context);
     RUN_TEST(test_3d_write_memory);
     RUN_TEST(test_3d_invalid_address);
+    RUN_TEST(test_read_data_by_id_response_overflow);
     return UNITY_END();
 }
