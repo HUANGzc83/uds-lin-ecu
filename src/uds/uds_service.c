@@ -8,7 +8,14 @@
  * ISO 14229-1 Tables 4-7.
  *
  * Wave 3d Task 18 — Master Service Dispatch (UDS Request Router)
+ * Wave 1  Task  8 — Configurable RCRRP pre-send delay + async tracking
  */
+
+/*
+ * _POSIX_C_SOURCE must be defined before any system header so that
+ * clock_gettime(2) and CLOCK_MONOTONIC are visible under -std=c11.
+ */
+#define _POSIX_C_SOURCE 199309L
 
 #include "uds/uds_service.h"
 #include "uds/uds_svc_diagcomm.h"
@@ -19,6 +26,7 @@
 #include "uds/uds_svc_upload.h"
 #include "uds/uds_svc_auth.h"
 #include <stddef.h>   /* NULL */
+#include <time.h>     /* clock_gettime(), CLOCK_MONOTONIC */
 
 /* ======================================================================== *
  * Static Dispatch Table                                                     *
@@ -26,6 +34,41 @@
 
 /** @brief Static array of registered service entries */
 static uds_service_entry_t g_service_table[UDS_SERVICE_TABLE_MAX];
+
+/* ======================================================================== *
+ * Internal Helpers                                                          *
+ * ======================================================================== */
+
+/**
+ * @brief Get current time in milliseconds from CLOCK_MONOTONIC.
+ *
+ * Used by uds_service_dispatch_ex() for RCRRP elapsed-time tracking.
+ * On non-POSIX platforms this is a stub returning 0 (RCRRP delay check
+ * will never trigger — the feature requires platform time support).
+ */
+static uint32_t uds_get_time_ms(void)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint32_t)(ts.tv_sec * 1000U + (uint32_t)(ts.tv_nsec / 1000000U));
+}
+
+/**
+ * @brief Internal mutable entry lookup (avoids const cast in dispatch).
+ *
+ * Identical to uds_service_find() but returns a non-const pointer so the
+ * dispatch function can update rcrrp_state inline.
+ */
+static uds_service_entry_t* find_entry_mut(uint8_t sid)
+{
+    for (uint8_t i = 0; i < UDS_SERVICE_TABLE_MAX; i++)
+    {
+        if (g_service_table[i].active && g_service_table[i].sid == sid)
+            return &g_service_table[i];
+    }
+    return NULL;
+}
 
 /* ======================================================================== *
  * Static NRC Response Buffer                                                *
@@ -66,7 +109,8 @@ static bool secured_data_stub(const uds_request_t *req,
  * Dispatch Engine                                                           *
  * ======================================================================== */
 
-bool uds_service_register(uint8_t sid, uds_service_handler_t handler, uint8_t session_mask)
+bool uds_service_register_ex(uint8_t sid, uds_service_handler_t handler,
+                              uint8_t session_mask, uint16_t rcrrp_delay_ms)
 {
     if (handler == NULL)
         return false;
@@ -91,26 +135,33 @@ bool uds_service_register(uint8_t sid, uds_service_handler_t handler, uint8_t se
         return false;  /* Table full */
 
     /* Register the entry */
-    g_service_table[slot].sid          = sid;
-    g_service_table[slot].handler      = handler;
-    g_service_table[slot].session_mask = session_mask;
-    g_service_table[slot].active       = true;
+    g_service_table[slot].sid             = sid;
+    g_service_table[slot].handler         = handler;
+    g_service_table[slot].session_mask    = session_mask;
+    g_service_table[slot].active          = true;
+    g_service_table[slot].rcrrp_delay_ms  = rcrrp_delay_ms;
+    g_service_table[slot].rcrrp_state     = RCRRP_NONE;
 
     return true;
 }
 
-bool uds_service_dispatch(const uds_request_t *req,
-                          uds_response_t      *rsp,
-                          uint8_t              current_session,
-                          uds_addressing_t     ta_type,
-                          void                *context)
+bool uds_service_register(uint8_t sid, uds_service_handler_t handler, uint8_t session_mask)
+{
+    return uds_service_register_ex(sid, handler, session_mask, UDS_RCRRP_DELAY_MS);
+}
+
+bool uds_service_dispatch_ex(const uds_request_t *req,
+                              uds_response_t      *rsp,
+                              uint8_t              current_session,
+                              uds_addressing_t     ta_type,
+                              void                *context)
 {
     /* ---- Input validation ---- */
     if (req == NULL || rsp == NULL)
         return false;
 
-    /* ---- SID lookup ---- */
-    const uds_service_entry_t *entry = uds_service_find(req->sid);
+    /* ---- SID lookup (mutable — need to update rcrrp_state) ---- */
+    uds_service_entry_t *entry = find_entry_mut(req->sid);
 
     if (entry == NULL || !entry->active)
     {
@@ -151,8 +202,44 @@ bool uds_service_dispatch(const uds_request_t *req,
         }
     }
 
+    /*
+     * ---- RCRRP delay tracking ----
+     * If the handler's entry has a non-zero delay window, record the
+     * current time and set the state to PENDING_HANDLER so that we can
+     * check elapsed time after the handler returns.
+     *
+     * In a single-threaded context the handler runs synchronously, so
+     * the check is: if elapsed >= rcrrp_delay_ms, the handler took too
+     * long and an RCRRP should precede the final response; otherwise
+     * no RCRRP is needed.
+     */
+    uint32_t rcrrp_start_ms = 0;
+
+    if (entry->rcrrp_delay_ms > 0U)
+    {
+        rcrrp_start_ms       = uds_get_time_ms();
+        entry->rcrrp_state   = RCRRP_PENDING_HANDLER;
+    }
+
     /* ---- Delegate to the registered handler ---- */
     bool send_response = entry->handler(req, rsp, context);
+
+    /* ---- Post-handler RCRRP check ---- */
+    if (entry->rcrrp_delay_ms > 0U)
+    {
+        uint32_t elapsed_ms = uds_get_time_ms() - rcrrp_start_ms;
+
+        if (elapsed_ms >= (uint32_t)entry->rcrrp_delay_ms)
+        {
+            /* Handler exceeded the delay window — caller should send RCRRP */
+            entry->rcrrp_state = RCRRP_SENT;
+        }
+        else
+        {
+            /* Handler completed within the window — no RCRRP needed */
+            entry->rcrrp_state = RCRRP_NONE;
+        }
+    }
 
     /*
      * ---- Apply functional-addressing NRC suppression ----
@@ -183,14 +270,19 @@ bool uds_service_dispatch(const uds_request_t *req,
     return send_response;
 }
 
+bool uds_service_dispatch(const uds_request_t *req,
+                          uds_response_t      *rsp,
+                          uint8_t              current_session,
+                          uds_addressing_t     ta_type,
+                          void                *context)
+{
+    return uds_service_dispatch_ex(req, rsp, current_session, ta_type, context);
+}
+
 void uds_service_init(void)
 {
-    /* Clear the table */
-    for (uint8_t i = 0; i < UDS_SERVICE_TABLE_MAX; i++)
-    {
-        g_service_table[i].handler      = NULL;
-        g_service_table[i].active       = false;
-    }
+    /* Clear the table (resets all fields including RCRRP state) */
+    uds_service_clear();
 
     /*
      * ================================================================
@@ -288,19 +380,16 @@ uint8_t uds_service_get_count(void)
 
 const uds_service_entry_t* uds_service_find(uint8_t sid)
 {
-    for (uint8_t i = 0; i < UDS_SERVICE_TABLE_MAX; i++)
-    {
-        if (g_service_table[i].active && g_service_table[i].sid == sid)
-            return &g_service_table[i];
-    }
-    return NULL;
+    return find_entry_mut(sid);
 }
 
 void uds_service_clear(void)
 {
     for (uint8_t i = 0; i < UDS_SERVICE_TABLE_MAX; i++)
     {
-        g_service_table[i].handler      = NULL;
-        g_service_table[i].active       = false;
+        g_service_table[i].handler         = NULL;
+        g_service_table[i].active          = false;
+        g_service_table[i].rcrrp_delay_ms  = 0U;
+        g_service_table[i].rcrrp_state     = RCRRP_NONE;
     }
 }
