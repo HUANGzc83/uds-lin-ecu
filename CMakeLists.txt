@@ -1,6 +1,29 @@
 cmake_minimum_required(VERSION 3.14)
 project(uds-lin-ecu C)
 
+# ============================================================
+# POSIX HAL Platform Option
+# ============================================================
+# Set with -DHAL_PLATFORM=posix or -DUDS_PLATFORM_POSIX=ON to
+# replace hal_stubs.c with real POSIX implementations (UART via
+# /dev/ttyS0, timer via clock_gettime, NVM via file I/O).
+option(UDS_PLATFORM_POSIX "Build POSIX HAL implementations (UART, Timer, NVM)" OFF)
+
+# Support HAL_PLATFORM=posix shorthand (e.g. cmake -B build -DHAL_PLATFORM=posix)
+if(HAL_PLATFORM STREQUAL "posix")
+    set(UDS_PLATFORM_POSIX ON)
+endif()
+
+if(UDS_PLATFORM_POSIX)
+    set(HAL_BACKEND_SOURCES
+        src/hal/hal_uart_posix.c
+        src/hal/hal_timer_posix.c
+        src/hal/hal_nvm_posix.c
+    )
+else()
+    set(HAL_BACKEND_SOURCES src/hal/hal_stubs.c)
+endif()
+
 # ---- C Standard (strict C11, no GNU extensions) ----
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -56,7 +79,7 @@ add_library(uds-core STATIC
     src/uds/uds_svc_upload.c
     src/uds/uds_svc_auth.c
     src/uds/uds_service.c
-    src/hal/hal_stubs.c
+    ${HAL_BACKEND_SOURCES}
 )
 
 target_include_directories(uds-core PUBLIC
