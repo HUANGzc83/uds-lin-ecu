@@ -16,16 +16,6 @@
 #include "uds/uds_data.h"
 #include <string.h>   /* memset, memcpy */
 
-/* ======================================================================== *
- * Static Response / Data Buffers                                           *
- * ======================================================================== *
- * These buffers provide stable memory that rsp->data can point to.
- * They are safe because services are invoked sequentially (single-threaded).
- */
-
-/** @brief Large buffer for response data (DID data, scaling info, etc.) */
-static uint8_t g_rsp_buf[256];
-
 /** @brief Simulated RAM buffer for Read/WriteMemoryByAddress */
 static uint8_t g_memory_buf[MEMORY_BUF_SIZE];
 
@@ -64,12 +54,12 @@ static uds_periodic_did_entry_t g_periodic_dids[PERIODIC_DID_MAX];
  * Uses 0x7F as the "SID" so that uds_serialize_response produces:
  *   [0x7F][request_SID][NRC]  — the standard UDS negative response format.
  */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc)
+static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc, uint8_t *buf)
 {
-    g_rsp_buf[0] = nrc;
+    buf[0] = nrc;
     rsp->sid          = 0x7F;
     rsp->subfunc_echo = req_sid;
-    rsp->data         = g_rsp_buf;
+    rsp->data         = buf;
     rsp->data_len     = 1;
 }
 
@@ -285,10 +275,12 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
                               uds_response_t      *rsp,
                               void                *context)
 {
+    uint8_t rsp_buf[256];
+
     /* --- Validate context (must provide unlocked flag) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
         return true;
     }
 
@@ -299,7 +291,7 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
      * from byte[1] (via UDS_REQ_BYTE1) and data[0]. So data_len must be >=1 */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -310,27 +302,27 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
     const uds_did_entry_t *entry = uds_did_find(did);
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
-    uint16_t data_len = sizeof(g_rsp_buf);
-    if (!uds_did_read(did, g_rsp_buf, &data_len, unlocked))
+    uint16_t data_len = sizeof(rsp_buf);
+    if (!uds_did_read(did, rsp_buf, &data_len, unlocked))
     {
         /* Determine whether ROOR or SAD based on access type */
         if (entry->access == DID_SECURED_READ && !unlocked)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
+            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
         }
         else if (entry->access == DID_WRITE_ONLY ||
                  entry->access == DID_SECURED_WRITE)
         {
             /* These access types are not readable → ROOR */
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         }
         else
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         }
         return true;
     }
@@ -338,19 +330,19 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
     /* Build positive response: [0x62][DID_high][DID_low][data...] */
     /* We need to prepend the DID to the data in the response buffer.
      * Shift data right by 2 to make room for DID prefix. */
-    if (data_len + 2 > sizeof(g_rsp_buf))
+    if (data_len + 2 > sizeof(rsp_buf))
     {
-        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG);
+        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG, rsp_buf);
         return true;
     }
 
     /* Shift data to make room for DID at the front */
-    memmove(g_rsp_buf + 2, g_rsp_buf, data_len);
-    g_rsp_buf[0] = (uint8_t)(did >> 8);
-    g_rsp_buf[1] = (uint8_t)(did & 0xFF);
+    memmove(rsp_buf + 2, rsp_buf, data_len);
+    rsp_buf[0] = (uint8_t)(did >> 8);
+    rsp_buf[1] = (uint8_t)(did & 0xFF);
 
     set_pos_rsp(rsp, READ_DATA_BY_IDENTIFIER_RSP, 0,
-                g_rsp_buf, data_len + 2);
+                rsp_buf, data_len + 2);
     return true;
 }
 
@@ -362,6 +354,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
                                      uds_response_t      *rsp,
                                      void                *context)
 {
+    uint8_t rsp_buf[256];
     (void)context;
 
     /* --- IMLOIF: parse format byte (in subfunction due to parser) + address + size --- */
@@ -373,7 +366,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
     if (!parse_mem_addr_format(req, &address, &mem_size,
                                 &addr_bytes, &size_bytes))
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -383,7 +376,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
                                                          &region_offset);
     if (region == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -391,22 +384,22 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
     uint16_t data_offset = 1 + (uint16_t)addr_bytes + (uint16_t)size_bytes; /* fmt + addr + size */
     uint16_t total_resp  = data_offset + (uint16_t)mem_size;
 
-    if (total_resp > sizeof(g_rsp_buf))
+    if (total_resp > sizeof(rsp_buf))
     {
-        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG);
+        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG, rsp_buf);
         return true;
     }
 
     /* Build response header: [fmt][addr_bytes...][size_bytes...] */
-    g_rsp_buf[0] = UDS_REQ_BYTE1(req);  /* format byte */
-    memcpy(g_rsp_buf + 1, req->data, addr_bytes);          /* address bytes */
-    memcpy(g_rsp_buf + 1 + addr_bytes, req->data + addr_bytes, size_bytes);  /* size bytes */
+    rsp_buf[0] = UDS_REQ_BYTE1(req);  /* format byte */
+    memcpy(rsp_buf + 1, req->data, addr_bytes);          /* address bytes */
+    memcpy(rsp_buf + 1 + addr_bytes, req->data + addr_bytes, size_bytes);  /* size bytes */
 
     /* Append memory data */
-    memcpy(g_rsp_buf + data_offset, region->data + region_offset, mem_size);
+    memcpy(rsp_buf + data_offset, region->data + region_offset, mem_size);
 
     set_pos_rsp(rsp, READ_MEMORY_BY_ADDRESS_RSP, 0,
-                g_rsp_buf, total_resp);
+                rsp_buf, total_resp);
     return true;
 }
 
@@ -418,10 +411,12 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
                                       uds_response_t      *rsp,
                                       void                *context)
 {
+    uint8_t rsp_buf[256];
+
     /* --- Validate context --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
         return true;
     }
 
@@ -430,7 +425,7 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
     /* --- IMLOIF: need at least 1 byte data --- */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -440,41 +435,41 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
     const uds_did_entry_t *entry = uds_did_find(did);
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
     /* Read DID data */
-    uint16_t data_len = sizeof(g_rsp_buf);
-    if (!uds_did_read(did, g_rsp_buf + 2, &data_len, unlocked))
+    uint16_t data_len = sizeof(rsp_buf);
+    if (!uds_did_read(did, rsp_buf + 2, &data_len, unlocked))
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
     /* Prepend DID in response buffer */
-    g_rsp_buf[0] = (uint8_t)(did >> 8);
-    g_rsp_buf[1] = (uint8_t)(did & 0xFF);
+    rsp_buf[0] = (uint8_t)(did >> 8);
+    rsp_buf[1] = (uint8_t)(did & 0xFF);
 
     /* Append simplified scaling info: 2-byte scale (0x0100 = 1.0),
      * 2-byte offset (0x0000), 1-byte unit (0x01) */
     uint16_t did_data_len = data_len;
     uint16_t scaling_len = did_data_len + 5;
 
-    if (2 + scaling_len > sizeof(g_rsp_buf))
+    if (2 + scaling_len > sizeof(rsp_buf))
     {
-        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG);
+        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG, rsp_buf);
         return true;
     }
 
-    g_rsp_buf[2 + did_data_len + 0] = 0x01; /* scale factor high */
-    g_rsp_buf[2 + did_data_len + 1] = 0x00; /* scale factor low */
-    g_rsp_buf[2 + did_data_len + 2] = 0x00; /* offset high */
-    g_rsp_buf[2 + did_data_len + 3] = 0x00; /* offset low */
-    g_rsp_buf[2 + did_data_len + 4] = 0x01; /* unit */
+    rsp_buf[2 + did_data_len + 0] = 0x01; /* scale factor high */
+    rsp_buf[2 + did_data_len + 1] = 0x00; /* scale factor low */
+    rsp_buf[2 + did_data_len + 2] = 0x00; /* offset high */
+    rsp_buf[2 + did_data_len + 3] = 0x00; /* offset low */
+    rsp_buf[2 + did_data_len + 4] = 0x01; /* unit */
 
     set_pos_rsp(rsp, READ_SCALING_DATA_BY_ID_RSP, 0,
-                g_rsp_buf, 2 + scaling_len);
+                rsp_buf, 2 + scaling_len);
     return true;
 }
 
@@ -486,13 +481,14 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
                                        uds_response_t      *rsp,
                                        void                *context)
 {
+    uint8_t rsp_buf[4];
     (void)context;
 
     /* --- IMLOIF: need transmission mode (subfunction) + at least
      *    periodicDID(1) + source DID(2) = 3 data bytes --- */
     if (req->data_len < 3 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -501,7 +497,7 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
     /* --- ROOR: validate transmission mode --- */
     if (transmission_mode < 0x01 || transmission_mode > 0x03)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -511,7 +507,7 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
     /* --- ROOR: check source DID exists --- */
     if (uds_did_find(source_did) == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -519,7 +515,7 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
     uint8_t slot = find_free_periodic_slot();
     if (slot >= PERIODIC_DID_MAX)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -548,6 +544,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
                                         uds_response_t      *rsp,
                                         void                *context)
 {
+    uint8_t rsp_buf[4];
     (void)context;
 
     /* --- IMLOIF: need at least 1 data byte (definitionMode) --- */
@@ -555,7 +552,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
      * req->subfunction.value (byte[1] of raw), and data[0] onward is payload. */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -574,7 +571,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
          */
         if (req->data_len < 2)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
 
@@ -584,21 +581,21 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         /* Check for source definitions: each is 6 bytes (DID_h,DID_l,off_h,off_l,len_h,len_l) */
         if (remaining < 6 || (remaining % 6) != 0)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
 
         uint8_t num_sources = (uint8_t)(remaining / 6);
         if (num_sources == 0 || num_sources > DYNAMIC_DID_SOURCE_MAX)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
             return true;
         }
 
         /* Check target DID doesn't already exist as dynamic DID */
         if (find_dynamic_did(target_did) != NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
             return true;
         }
 
@@ -606,7 +603,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         uint8_t slot = find_free_dynamic_slot();
         if (slot >= DYNAMIC_DID_MAX)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
             return true;
         }
 
@@ -627,10 +624,10 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         }
 
         /* Positive response: [0x6C][targetDID_h][targetDID_l] */
-        g_rsp_buf[0] = (uint8_t)(target_did >> 8);
-        g_rsp_buf[1] = (uint8_t)(target_did & 0xFF);
+        rsp_buf[0] = (uint8_t)(target_did >> 8);
+        rsp_buf[1] = (uint8_t)(target_did & 0xFF);
         set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID_RSP, 0,
-                    g_rsp_buf, 2);
+                    rsp_buf, 2);
         return true;
     }
 
@@ -643,7 +640,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
          */
         if (req->data_len < 8)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
 
@@ -651,14 +648,14 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
 
         if (find_dynamic_did(target_did) != NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
             return true;
         }
 
         uint8_t slot = find_free_dynamic_slot();
         if (slot >= DYNAMIC_DID_MAX)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
             return true;
         }
 
@@ -676,10 +673,10 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         g_dynamic_dids[slot].sources[0].len  = mem_len;
         g_dynamic_dids[slot].sources[0].did  = 0;
 
-        g_rsp_buf[0] = (uint8_t)(target_did >> 8);
-        g_rsp_buf[1] = (uint8_t)(target_did & 0xFF);
+        rsp_buf[0] = (uint8_t)(target_did >> 8);
+        rsp_buf[1] = (uint8_t)(target_did & 0xFF);
         set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID_RSP, 0,
-                    g_rsp_buf, 2);
+                    rsp_buf, 2);
         return true;
     }
 
@@ -688,7 +685,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         /* Format: [0x2C][0x03][targetDID_h][targetDID_l] */
         if (req->data_len < 2)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
 
@@ -697,23 +694,23 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         uds_dynamic_did_entry_t *entry = find_dynamic_did(target_did);
         if (entry == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
             return true;
         }
 
         entry->active = false;
         memset(entry, 0, sizeof(*entry));
 
-        g_rsp_buf[0] = (uint8_t)(target_did >> 8);
-        g_rsp_buf[1] = (uint8_t)(target_did & 0xFF);
+        rsp_buf[0] = (uint8_t)(target_did >> 8);
+        rsp_buf[1] = (uint8_t)(target_did & 0xFF);
         set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID_RSP, 0,
-                    g_rsp_buf, 2);
+                    rsp_buf, 2);
         return true;
     }
 
     default:
         /* ROOR: unsupported definition mode */
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 }
@@ -726,10 +723,12 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
                                uds_response_t      *rsp,
                                void                *context)
 {
+    uint8_t rsp_buf[4];
+
     /* --- Validate context (must provide unlocked flag) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
         return true;
     }
 
@@ -738,7 +737,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
     /* --- IMLOIF: need at least 1 byte data (DID high in byte[1], DID low in data[0]) --- */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -748,7 +747,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
     const uds_did_entry_t *entry = uds_did_find(did);
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -759,7 +758,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
 
     if (write_len == 0)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -771,24 +770,24 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
             entry->access == DID_SECURED_READ)
         {
             /* Not writable at all */
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         }
         else if (entry->access == DID_SECURED_WRITE && !unlocked)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
+            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
         }
         else
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         }
         return true;
     }
 
     /* Build positive response: [0x6E][DID_high][DID_low] */
-    g_rsp_buf[0] = (uint8_t)(did >> 8);
-    g_rsp_buf[1] = (uint8_t)(did & 0xFF);
+    rsp_buf[0] = (uint8_t)(did >> 8);
+    rsp_buf[1] = (uint8_t)(did & 0xFF);
     set_pos_rsp(rsp, WRITE_DATA_BY_IDENTIFIER_RSP, 0,
-                g_rsp_buf, 2);
+                rsp_buf, 2);
     return true;
 }
 
@@ -800,10 +799,12 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
                                       uds_response_t      *rsp,
                                       void                *context)
 {
+    uint8_t rsp_buf[16];
+
     /* --- Validate context (must provide unlocked flag) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
         return true;
     }
 
@@ -812,7 +813,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
     /* --- SAD: security must be unlocked --- */
     if (!unlocked)
     {
-        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
+        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
         return true;
     }
 
@@ -825,7 +826,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
     if (!parse_mem_addr_format(req, &address, &mem_size,
                                 &addr_bytes, &size_bytes))
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -837,7 +838,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
 
     if (req->data_len < total_in_data)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -850,7 +851,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
                                                          &region_offset);
     if (region == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -859,12 +860,12 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
 
     /* Build positive response: [0x7D][fmt][addr_bytes...][size_bytes...] */
     uint16_t header_len = 1 + (uint16_t)addr_bytes + (uint16_t)size_bytes;
-    g_rsp_buf[0] = UDS_REQ_BYTE1(req);  /* format byte */
-    memcpy(g_rsp_buf + 1, req->data, addr_bytes);
-    memcpy(g_rsp_buf + 1 + addr_bytes, req->data + addr_bytes, size_bytes);
+    rsp_buf[0] = UDS_REQ_BYTE1(req);  /* format byte */
+    memcpy(rsp_buf + 1, req->data, addr_bytes);
+    memcpy(rsp_buf + 1 + addr_bytes, req->data + addr_bytes, size_bytes);
 
     set_pos_rsp(rsp, WRITE_MEMORY_BY_ADDRESS_RSP, 0,
-                g_rsp_buf, header_len);
+                rsp_buf, header_len);
     return true;
 }
 

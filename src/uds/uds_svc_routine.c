@@ -25,16 +25,6 @@
 #include <string.h>   /* memset, memcpy */
 
 /* ======================================================================== *
- * Static Response Buffer                                                    *
- * ======================================================================== *
- * Provides stable memory that rsp->data can point to.
- * Safe because services are invoked sequentially (single-threaded).
- */
-
-/** @brief Buffer for routineStatusRecord and NRC data */
-static uint8_t g_rsp_data_buf[UDS_ROUTINE_RSP_MAX];
-
-/* ======================================================================== *
  * Routine Registry                                                         *
  * ======================================================================== */
 
@@ -55,13 +45,13 @@ static uds_routine_entry_t g_routine_registry[UDS_ROUTINE_MAX];
  * @param[in]  req_sid  Original request SID
  * @param[in]  nrc      Negative response code
  */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc)
+static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc, uint8_t *buf)
 {
-    g_rsp_data_buf[0] = nrc;
+    buf[0] = nrc;
 
     rsp->sid          = 0x7F;           /* negative response prefix */
     rsp->subfunc_echo = req_sid;        /* original SID */
-    rsp->data         = g_rsp_data_buf; /* points to NRC byte */
+    rsp->data         = buf;            /* points to NRC byte */
     rsp->data_len     = 1;
 }
 
@@ -213,6 +203,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
                               uds_response_t      *rsp,
                               void                *context)
 {
+    uint8_t rsp_buf[4];
     uint8_t subfn = req->subfunction.value;
 
     /* --------------------------------------------------------------- *
@@ -220,7 +211,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
      * --------------------------------------------------------------- */
     if (!is_subfn_valid(subfn))
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
@@ -229,7 +220,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
      * --------------------------------------------------------------- */
     if (req->data_len < 2u || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -254,7 +245,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
 
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -266,7 +257,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
         bool unlocked = (context != NULL) ? *((const bool *)context) : false;
         if (!unlocked)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
+            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
             return true;
         }
     }
@@ -286,19 +277,19 @@ bool uds_svc_routine_control(const uds_request_t *req,
         /* CNC: check if the routine is already running */
         if (entry->is_running)
         {
-            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
             return true;
         }
         /* CNC: check if any other routine is running (one-at-a-time) */
         if (is_any_other_running(routine_id))
         {
-            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
             return true;
         }
         /* SFNS: start must be supported (have a callback) */
         if (entry->start_fn == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
             return true;
         }
         /* Invoke start callback */
@@ -307,7 +298,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
                                        callback_resp, &callback_resp_len);
         if (!callback_ok)
         {
-            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE);
+            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, rsp_buf);
             return true;
         }
         /* Mark as running */
@@ -318,13 +309,13 @@ bool uds_svc_routine_control(const uds_request_t *req,
         /* CNC: check if the routine is running */
         if (!entry->is_running)
         {
-            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
             return true;
         }
         /* SFNS: stop must be supported */
         if (entry->stop_fn == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
             return true;
         }
         /* Invoke stop callback */
@@ -333,7 +324,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
                                       callback_resp, &callback_resp_len);
         if (!callback_ok)
         {
-            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE);
+            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, rsp_buf);
             return true;
         }
         /* Clear running flag */
@@ -344,7 +335,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
         /* SFNS: requestResults must be supported */
         if (entry->results_fn == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
             return true;
         }
         /* Invoke results callback (routine does not need to be running) */
@@ -353,14 +344,14 @@ bool uds_svc_routine_control(const uds_request_t *req,
                                          callback_resp, &callback_resp_len);
         if (!callback_ok)
         {
-            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE);
+            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, rsp_buf);
             return true;
         }
         break;
 
     default:
         /* Should not reach (validated above), but defensive */
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
@@ -375,9 +366,8 @@ bool uds_svc_routine_control(const uds_request_t *req,
     /* --------------------------------------------------------------- *
      * Build positive response with routineStatusRecord                *
      * --------------------------------------------------------------- */
-    memcpy(g_rsp_data_buf, callback_resp, callback_resp_len);
     set_pos_rsp(rsp, ROUTINE_CONTROL_RSP, subfn,
-                g_rsp_data_buf, callback_resp_len);
+                callback_resp, callback_resp_len);
     return true;
 }
 

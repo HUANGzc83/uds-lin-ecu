@@ -23,23 +23,6 @@
 #include "uds/uds_security.h"
 #include <string.h>   /* memset, memcpy */
 
-/* ======================================================================== *
- * Static Response Buffers                                                   *
- * ======================================================================== *
- * These buffers provide stable memory that rsp->data can point to.
- * They are safe because services are invoked sequentially (single-threaded).
- */
-
-/** @brief Buffer for short response data (session params, powerDownTime, etc.) */
-static uint8_t g_rsp_data_buf[4];
-
-/** @brief Buffer for seed value returned by SecurityAccess.requestSeed */
-static uint8_t g_seed_buf[SECURITY_SEED_SIZE];
-
-/* ======================================================================== *
- * Event Store (for ResponseOnEvent 0x86)                                   *
- * ======================================================================== */
-
 /** @brief Static array of event records */
 static uds_event_record_t g_event_store[UDS_EVENT_STORE_MAX];
 
@@ -57,14 +40,14 @@ static uds_event_record_t g_event_store[UDS_EVENT_STORE_MAX];
  * @param[in]  req_sid  Original request SID
  * @param[in]  nrc      Negative response code
  */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc)
+static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc, uint8_t *buf)
 {
-    /* Pack NRC into the single static byte */
-    g_rsp_data_buf[0] = nrc;
+    /* Pack NRC into the buffer byte */
+    buf[0] = nrc;
 
     rsp->sid          = 0x7F;           /* negative response prefix */
     rsp->subfunc_echo = req_sid;        /* original SID */
-    rsp->data         = g_rsp_data_buf; /* points to NRC byte */
+    rsp->data         = buf;            /* points to NRC byte */
     rsp->data_len     = 1;
 }
 
@@ -193,10 +176,12 @@ bool uds_svc_diagnostic_session_control(const uds_request_t *req,
                                         uds_response_t      *rsp,
                                         void                *context)
 {
+    uint8_t rsp_buf[4];
+
     /* --- Validate context --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
         return true;
     }
 
@@ -206,7 +191,7 @@ bool uds_svc_diagnostic_session_control(const uds_request_t *req,
     /* --- IMLOIF: no additional data bytes expected --- */
     if (req->data_len != 0u)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -216,7 +201,7 @@ bool uds_svc_diagnostic_session_control(const uds_request_t *req,
 
     if (status != UDS_OK)
     {
-        set_neg_rsp(rsp, req->sid, (uint8_t)nrc);
+        set_neg_rsp(rsp, req->sid, (uint8_t)nrc, rsp_buf);
         return true;
     }
 
@@ -229,13 +214,13 @@ bool uds_svc_diagnostic_session_control(const uds_request_t *req,
     /* --- Build sessionParameterRecord (P2Server_max + P2*Server_max) --- */
     const uds_std_return_t *params = uds_session_get_params(sctx);
 
-    g_rsp_data_buf[0] = (uint8_t)((params->p2_server_max >> 8) & 0xFFu);
-    g_rsp_data_buf[1] = (uint8_t)( params->p2_server_max       & 0xFFu);
-    g_rsp_data_buf[2] = (uint8_t)((params->p2_star_server_max >> 8) & 0xFFu);
-    g_rsp_data_buf[3] = (uint8_t)( params->p2_star_server_max       & 0xFFu);
+    rsp_buf[0] = (uint8_t)((params->p2_server_max >> 8) & 0xFFu);
+    rsp_buf[1] = (uint8_t)( params->p2_server_max       & 0xFFu);
+    rsp_buf[2] = (uint8_t)((params->p2_star_server_max >> 8) & 0xFFu);
+    rsp_buf[3] = (uint8_t)( params->p2_star_server_max       & 0xFFu);
 
     set_pos_rsp(rsp, DIAGNOSTIC_SESSION_CONTROL_RSP,
-                session_type, g_rsp_data_buf, 4);
+                session_type, rsp_buf, 4);
     return true;
 }
 
@@ -247,6 +232,7 @@ bool uds_svc_ecu_reset(const uds_request_t *req,
                        uds_response_t      *rsp,
                        void                *context)
 {
+    uint8_t rsp_buf[4];
     (void)context;
 
     uint8_t reset_type = req->subfunction.value;
@@ -254,14 +240,14 @@ bool uds_svc_ecu_reset(const uds_request_t *req,
     /* --- IMLOIF: no additional data expected --- */
     if (req->data_len != 0u)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
     /* --- SFNS: check reset type is supported --- */
     if (!is_reset_type_supported(reset_type))
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
@@ -272,9 +258,9 @@ bool uds_svc_ecu_reset(const uds_request_t *req,
     }
 
     /* --- Build positive response with powerDownTime = 0x00 --- */
-    g_rsp_data_buf[0] = 0x00u;
+    rsp_buf[0] = 0x00u;
 
-    set_pos_rsp(rsp, ECU_RESET_RSP, reset_type, g_rsp_data_buf, 1);
+    set_pos_rsp(rsp, ECU_RESET_RSP, reset_type, rsp_buf, 1);
     return true;
 }
 
@@ -286,12 +272,13 @@ bool uds_svc_security_access(const uds_request_t *req,
                              uds_response_t      *rsp,
                              void                *context)
 {
+    uint8_t rsp_buf[SECURITY_SEED_SIZE];
     uint8_t level = req->subfunction.value;
 
     /* --- SFNS: level must be 1..0x7F --- */
     if (level == 0u || level > 0x7Fu)
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
@@ -302,15 +289,15 @@ bool uds_svc_security_access(const uds_request_t *req,
         /* IMLOIF: no additional data bytes expected */
         if (req->data_len != 0u)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
 
         /* Call security module */
-        uint8_t seed_len = sizeof(g_seed_buf);
+        uint8_t seed_len = sizeof(rsp_buf);
         uds_nrc_t nrc    = NRC_GENERAL_REJECT;
 
-        uds_status_t status = uds_security_request_seed(level, g_seed_buf,
+        uds_status_t status = uds_security_request_seed(level, rsp_buf,
                                                          &seed_len, &nrc);
 
         if (status != UDS_OK || nrc != NRC_POSITIVE_RESPONSE)
@@ -319,7 +306,7 @@ bool uds_svc_security_access(const uds_request_t *req,
             uint8_t out_nrc = (status != UDS_OK)
                                 ? NRC_GENERAL_REJECT
                                 : (uint8_t)nrc;
-            set_neg_rsp(rsp, req->sid, out_nrc);
+            set_neg_rsp(rsp, req->sid, out_nrc, rsp_buf);
             return true;
         }
 
@@ -331,7 +318,7 @@ bool uds_svc_security_access(const uds_request_t *req,
 
         /* Build positive response with seed data */
         set_pos_rsp(rsp, SECURITY_ACCESS_RSP, level,
-                    g_seed_buf, seed_len);
+                    rsp_buf, seed_len);
         return true;
     }
     else
@@ -340,7 +327,7 @@ bool uds_svc_security_access(const uds_request_t *req,
         /* IMLOIF: at least 1 key byte required */
         if (req->data_len == 0u || req->data == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
 
@@ -355,7 +342,7 @@ bool uds_svc_security_access(const uds_request_t *req,
             uint8_t out_nrc = (status != UDS_OK)
                                 ? NRC_GENERAL_REJECT
                                 : (uint8_t)nrc;
-            set_neg_rsp(rsp, req->sid, out_nrc);
+            set_neg_rsp(rsp, req->sid, out_nrc, rsp_buf);
             return true;
         }
 
@@ -385,6 +372,7 @@ bool uds_svc_communication_control(const uds_request_t *req,
                                    uds_response_t      *rsp,
                                    void                *context)
 {
+    uint8_t rsp_buf[4];
     (void)context;
 
     uint8_t control_type = req->subfunction.value;
@@ -392,7 +380,7 @@ bool uds_svc_communication_control(const uds_request_t *req,
     /* --- IMLOIF: at least 1 data byte (communicationType) required --- */
     if (req->data_len < 1u || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -401,14 +389,14 @@ bool uds_svc_communication_control(const uds_request_t *req,
     /* --- SFNS: check controlType --- */
     if (!is_control_type_valid(control_type))
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
     /* --- ROOR: check communicationType --- */
     if (!is_comm_type_valid(comm_type))
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
         return true;
     }
 
@@ -431,12 +419,13 @@ bool uds_svc_tester_present(const uds_request_t *req,
                             uds_response_t      *rsp,
                             void                *context)
 {
+    uint8_t rsp_buf[4];
     (void)context;
 
     /* --- IMLOIF: no additional data expected --- */
     if (req->data_len != 0u)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -459,12 +448,13 @@ bool uds_svc_control_dtc_setting(const uds_request_t *req,
                                  uds_response_t      *rsp,
                                  void                *context)
 {
+    uint8_t rsp_buf[4];
     uint8_t dtc_setting = req->subfunction.value;
 
     /* --- Validate context (unlocked flag required) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
         return true;
     }
 
@@ -473,14 +463,14 @@ bool uds_svc_control_dtc_setting(const uds_request_t *req,
     /* --- SAD: security must be unlocked --- */
     if (!unlocked)
     {
-        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
+        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
         return true;
     }
 
     /* --- SFNS: check dtcSettingType --- */
     if (!is_dtc_setting_supported(dtc_setting))
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
@@ -503,6 +493,7 @@ bool uds_svc_response_on_event(const uds_request_t *req,
                                uds_response_t      *rsp,
                                void                *context)
 {
+    uint8_t rsp_buf[4];
     (void)context;
 
     uint8_t event_subfn = req->subfunction.value;
@@ -510,14 +501,14 @@ bool uds_svc_response_on_event(const uds_request_t *req,
     /* --- SFNS: validate event subfunction --- */
     if (!is_event_subfn_valid(event_subfn))
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
     /* --- IMLOIF: at least 1 data byte (eventType) required --- */
     if (req->data_len < 1u || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
         return true;
     }
 
@@ -578,7 +569,7 @@ bool uds_svc_response_on_event(const uds_request_t *req,
 
     default:
         /* Should not reach here (validated above), but handle defensively */
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
@@ -601,6 +592,7 @@ bool uds_svc_link_control(const uds_request_t *req,
                           uds_response_t      *rsp,
                           void                *context)
 {
+    uint8_t rsp_buf[4];
     (void)context;
 
     uint8_t link_subfn = req->subfunction.value;
@@ -611,7 +603,7 @@ bool uds_svc_link_control(const uds_request_t *req,
         /* verifyBaudrateTransition: needs 3-byte baudrate identifier */
         if (req->data_len < 3u || req->data == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
     }
@@ -620,14 +612,14 @@ bool uds_svc_link_control(const uds_request_t *req,
         /* transitionBaudrate: no additional data required */
         if (req->data_len != 0u)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
             return true;
         }
     }
     else
     {
         /* SFNS: unsupported subfunction */
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
         return true;
     }
 
