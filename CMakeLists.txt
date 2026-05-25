@@ -243,3 +243,24 @@ add_uds_test(integration test/test_uds_integration.c test/mock/mock_uart.c test/
 # Service Dispatch Tests (Wave 3d Task 18)
 # ============================================================
 add_uds_test(service test/test_svc_service.c test/mock/mock_timer.c)
+
+# ============================================================
+# Fuzz Targets (optional, enabled with -DENABLE_FUZZ=ON)
+# ============================================================
+option(ENABLE_FUZZ "Enable fuzz targets" OFF)
+
+if(ENABLE_FUZZ)
+    # Standalone fuzz harness for UDS Parser/Serializer
+    add_executable(fuzz-uds-parser test/fuzz/fuzz_uds_parser.c)
+    target_link_libraries(fuzz-uds-parser PRIVATE uds-core)
+    target_include_directories(fuzz-uds-parser PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+    add_uds_warnings(fuzz-uds-parser)
+
+    # Standalone fuzz harness for LIN Transport
+    add_executable(fuzz-lin-transport test/fuzz/fuzz_lin_transport.c)
+    target_link_libraries(fuzz-lin-transport PRIVATE uds-core)
+    target_include_directories(fuzz-lin-transport PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+    add_uds_warnings(fuzz-lin-transport)
+endif()
