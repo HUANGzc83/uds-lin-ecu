@@ -54,6 +54,11 @@ extern "C" {
 #define MEMORY_BUF_SIZE 1024
 #endif
 
+/** @brief Maximum number of registrable memory regions for 0x23/0x3D */
+#ifndef UDS_MEM_REGION_MAX
+#define UDS_MEM_REGION_MAX 8
+#endif
+
 /* ======================================================================== *
  * Helper Macro — Reconstruct byte[1] of raw request                        *
  * ======================================================================== *
@@ -347,6 +352,33 @@ uint8_t uds_svc_data_get_periodic_did_count(void);
  * @return Pointer to the entry, or NULL if index out of range
  */
 const uds_periodic_did_entry_t* uds_svc_data_get_periodic_did(uint8_t idx);
+
+/* ======================================================================== *
+ * Runtime Memory Region Registration API                                   *
+ * ======================================================================== */
+
+/**
+ * @brief Register a memory region for 0x23/0x3D address space.
+ *
+ * The region's data buffer must remain valid after registration.
+ *
+ * @param start  First valid address (inclusive)
+ * @param end    Last valid address (inclusive), must be >= start
+ * @param data   Pointer to the region's data buffer
+ * @return true if registered, false if table full or invalid parameters
+ */
+bool uds_register_memory_region(uint32_t start, uint32_t end, uint8_t *data);
+
+/**
+ * @brief Get the number of currently registered memory regions.
+ * @return Count of registered regions (0..UDS_MEM_REGION_MAX)
+ */
+uint8_t uds_memory_region_count(void);
+
+/**
+ * @brief Clear all registered memory regions (reset to empty).
+ */
+void uds_memory_regions_clear(void);
 
 #ifdef __cplusplus
 }

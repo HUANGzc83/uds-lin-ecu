@@ -23,12 +23,11 @@ static uint8_t g_memory_buf[MEMORY_BUF_SIZE];
  * Memory Region Table (for 0x23 / 0x3D)                                   *
  * ======================================================================== */
 
-/** @brief Static table of virtual memory regions */
-static const uds_mem_region_t g_memory_regions[] = {
-    {0x00000000, 0x000003FF, g_memory_buf},  /* 1 KB simulated RAM */
-};
-#define MEMORY_REGION_COUNT \
-    ((uint16_t)(sizeof(g_memory_regions) / sizeof(g_memory_regions[0])))
+/** @brief Registrable table of virtual memory regions */
+static uds_mem_region_t g_memory_regions[UDS_MEM_REGION_MAX];
+
+/** @brief Number of currently registered memory regions */
+static uint8_t g_memory_region_count = 0;
 
 /* ======================================================================== *
  * Dynamic DID Storage (for 0x2C)                                          *
@@ -193,7 +192,7 @@ static const uds_mem_region_t* find_memory_region(uint32_t address,
         return NULL;   /* overflow — address range wraps past 2^32 */
     }
 
-    for (uint16_t i = 0; i < MEMORY_REGION_COUNT; i++)
+    for (uint8_t i = 0; i < g_memory_region_count; i++)
     {
         const uds_mem_region_t *reg = &g_memory_regions[i];
 
@@ -205,6 +204,39 @@ static const uds_mem_region_t* find_memory_region(uint32_t address,
         }
     }
     return NULL;
+}
+
+/* ======================================================================== *
+ * Runtime Memory Region Registration API                                   *
+ * ======================================================================== */
+
+bool uds_register_memory_region(uint32_t start, uint32_t end, uint8_t *data)
+{
+    if (data == NULL || end < start)
+    {
+        return false;
+    }
+
+    if (g_memory_region_count >= UDS_MEM_REGION_MAX)
+    {
+        return false;
+    }
+
+    g_memory_regions[g_memory_region_count].start_addr = start;
+    g_memory_regions[g_memory_region_count].end_addr   = end;
+    g_memory_regions[g_memory_region_count].data       = data;
+    g_memory_region_count++;
+    return true;
+}
+
+uint8_t uds_memory_region_count(void)
+{
+    return g_memory_region_count;
+}
+
+void uds_memory_regions_clear(void)
+{
+    g_memory_region_count = 0;
 }
 
 /* ======================================================================== *
@@ -878,6 +910,9 @@ void uds_svc_data_init(void)
     memset(g_memory_buf, 0, sizeof(g_memory_buf));
     memset(g_dynamic_dids, 0, sizeof(g_dynamic_dids));
     memset(g_periodic_dids, 0, sizeof(g_periodic_dids));
+
+    uds_memory_regions_clear();
+    uds_register_memory_region(0x00000000, 0x000003FF, g_memory_buf);
 }
 
 uint8_t* uds_svc_data_get_memory_buf(void)
@@ -887,7 +922,7 @@ uint8_t* uds_svc_data_get_memory_buf(void)
 
 uint16_t uds_svc_data_get_memory_region_count(void)
 {
-    return MEMORY_REGION_COUNT;
+    return (uint16_t)g_memory_region_count;
 }
 
 const uds_mem_region_t* uds_svc_data_get_memory_regions(void)
