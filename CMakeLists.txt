@@ -23,6 +23,22 @@ macro(add_uds_test_config TARGET)
 endmacro()
 
 # ============================================================
+# Test Executable Macro (reduces 17x boilerplate to 1-liners)
+# ============================================================
+# Links uds-core and unity with --allow-multiple-definition (set on
+# unity's INTERFACE).  Includes test/ and test/mock/ dirs via
+# add_uds_test_config().  EXTRA_SOURCES from ARGN go to add_executable.
+function(add_uds_test TEST_NAME TEST_SOURCE)
+    add_executable(uds-${TEST_NAME}-test ${TEST_SOURCE} ${ARGN})
+    target_link_libraries(uds-${TEST_NAME}-test PRIVATE uds-core unity)
+    target_include_directories(uds-${TEST_NAME}-test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/test)
+    add_test(NAME uds-${TEST_NAME}-test COMMAND uds-${TEST_NAME}-test)
+    add_uds_warnings(uds-${TEST_NAME}-test)
+    add_uds_test_config(uds-${TEST_NAME}-test)
+endfunction()
+
+# ============================================================
 # Main Library Target: uds-core
 # ============================================================
 add_library(uds-core STATIC
@@ -92,323 +108,76 @@ target_link_options(unity INTERFACE "-Wl,--allow-multiple-definition")
 # ============================================================
 enable_testing()
 
-add_executable(uds-test
-    test/test_core.c
-)
-
-target_link_libraries(uds-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-)
-
-add_test(NAME uds-test COMMAND uds-test)
-
-add_uds_warnings(uds-test)
-add_uds_test_config(uds-test)
+add_uds_test(core test/test_core.c)
 
 # ============================================================
 # Session State Machine Tests (Wave 2 Task 7)
 # ============================================================
-add_executable(uds-session-test
-    test/test_session.c
-)
-
-target_link_libraries(uds-session-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-session-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-)
-
-add_test(NAME uds-session-test COMMAND uds-session-test)
-
-add_uds_warnings(uds-session-test)
-add_uds_test_config(uds-session-test)
+add_uds_test(session test/test_session.c)
 
 # ============================================================
 # LIN Transport Tests (Wave 2 Task 8)
 # ============================================================
-add_executable(uds-lin-transport-test
-    test/test_lin_transport.c
-)
-
-target_link_libraries(uds-lin-transport-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-lin-transport-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-)
-
-add_test(NAME uds-lin-transport-test COMMAND uds-lin-transport-test)
-
-add_uds_warnings(uds-lin-transport-test)
-add_uds_test_config(uds-lin-transport-test)
+add_uds_test(lin-transport test/test_lin_transport.c)
 
 # ============================================================
 # DTC State Machine Tests (Wave 3b Task 15)
 # ============================================================
-add_executable(uds-dtc-test
-    test/test_dtc.c
-)
-
-target_link_libraries(uds-dtc-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-dtc-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-)
-
-add_test(NAME uds-dtc-test COMMAND uds-dtc-test)
-
-add_uds_warnings(uds-dtc-test)
-add_uds_test_config(uds-dtc-test)
+add_uds_test(dtc test/test_dtc.c)
 
 # ============================================================
 # Security Access State Machine Tests (Wave 3b Task 16)
 # ============================================================
-# Note: This test compiles uds_security.c directly (rather than
-# linking uds-core) so it can use mock_timer in place of hal_stubs
-# for timer-dependent delay testing.
-add_executable(uds-security-test
-    test/test_security.c
-    src/uds/uds_security.c
-    test/mock/mock_timer.c
-)
-
-target_include_directories(uds-security-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-target_link_libraries(uds-security-test PRIVATE
-    unity
-)
-
-add_test(NAME uds-security-test COMMAND uds-security-test)
-
-add_uds_warnings(uds-security-test)
-add_uds_test_config(uds-security-test)
+# Note: Compiles uds_security.c directly with mock_timer so the
+# directly-compiled symbols override the uds-core equivalents via
+# --allow-multiple-definition (propagated from unity's INTERFACE).
+add_uds_test(security test/test_security.c src/uds/uds_security.c test/mock/mock_timer.c)
 
 # ============================================================
 # DID Registry Tests (Wave 3b Task 17)
 # ============================================================
-add_executable(uds-did-test
-    test/test_did.c
-)
-
-target_link_libraries(uds-did-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-did-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-)
-
-add_test(NAME uds-did-test COMMAND uds-did-test)
-
-add_uds_warnings(uds-did-test)
-add_uds_test_config(uds-did-test)
+add_uds_test(did test/test_did.c)
 
 # ============================================================
 # Diagnostic & Communication Management Services Tests (Wave 3a Task 9)
 # ============================================================
 # Note: Links mock_timer to satisfy hal_timer symbols needed by uds_security.
-add_executable(uds-diagcomm-test
-    test/test_svc_diagcomm.c
-    test/mock/mock_timer.c
-)
-
-target_link_libraries(uds-diagcomm-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-diagcomm-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-diagcomm-test COMMAND uds-diagcomm-test)
-
-add_uds_warnings(uds-diagcomm-test)
-add_uds_test_config(uds-diagcomm-test)
+add_uds_test(diagcomm test/test_svc_diagcomm.c test/mock/mock_timer.c)
 
 # ============================================================
 # Data Transmission Services Tests (Wave 3a Task 10)
 # ============================================================
-add_executable(uds-data-service-test
-    test/test_svc_data.c
-)
-
-target_link_libraries(uds-data-service-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-data-service-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-data-service-test COMMAND uds-data-service-test)
-
-add_uds_warnings(uds-data-service-test)
-add_uds_test_config(uds-data-service-test)
+add_uds_test(data-service test/test_svc_data.c)
 
 # ============================================================
 # IO Control Service Tests (Wave 3a Task 12)
 # ============================================================
-add_executable(uds-io-test
-    test/test_svc_io.c
-)
-
-target_link_libraries(uds-io-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-io-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-io-test COMMAND uds-io-test)
-
-add_uds_warnings(uds-io-test)
-add_uds_test_config(uds-io-test)
+add_uds_test(io test/test_svc_io.c)
 
 # ============================================================
 # Upload/Download Services Tests (Wave 3c Task 14)
 # ============================================================
-add_executable(uds-upload-test
-    test/test_svc_upload.c
-    test/mock/mock_timer.c
-)
-
-target_link_libraries(uds-upload-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-upload-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-upload-test COMMAND uds-upload-test)
-
-add_uds_warnings(uds-upload-test)
-add_uds_test_config(uds-upload-test)
+add_uds_test(upload test/test_svc_upload.c test/mock/mock_timer.c)
 
 # ============================================================
 # Stored Data Services Tests (Wave 3c Task 11)
 # ============================================================
-add_executable(uds-stored-test
-    test/test_svc_stored.c
-)
-
-target_link_libraries(uds-stored-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-stored-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-)
-
-add_test(NAME uds-stored-test COMMAND uds-stored-test)
-
-add_uds_warnings(uds-stored-test)
-add_uds_test_config(uds-stored-test)
+add_uds_test(stored test/test_svc_stored.c)
 
 # ============================================================
 # Routine Control Service Tests (Wave 3b Task 13)
 # ============================================================
-add_executable(uds-routine-test
-    test/test_svc_routine.c
-)
-
-target_link_libraries(uds-routine-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-routine-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-routine-test COMMAND uds-routine-test)
-
-add_uds_warnings(uds-routine-test)
-add_uds_test_config(uds-routine-test)
+add_uds_test(routine test/test_svc_routine.c)
 
 # ============================================================
 # Authentication Service Tests (Wave 3c Task 19)
 # ============================================================
-add_executable(uds-auth-test
-    test/test_svc_auth.c
-)
-
-target_link_libraries(uds-auth-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-auth-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-auth-test COMMAND uds-auth-test)
-
-add_uds_warnings(uds-auth-test)
-add_uds_test_config(uds-auth-test)
+add_uds_test(auth test/test_svc_auth.c)
 
 # ============================================================
 # LIN Master Simulator Tests (Wave 3d Task 20)
 # ============================================================
-add_executable(uds-lin-sim-test
-    test/test_lin_sim.c
-    test/lin_sim/lin_master_sim.c
-    test/mock/mock_uart.c
-    test/mock/mock_timer.c
-)
-
-target_link_libraries(uds-lin-sim-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-lin-sim-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-lin-sim-test COMMAND uds-lin-sim-test)
-
-add_uds_warnings(uds-lin-sim-test)
-add_uds_test_config(uds-lin-sim-test)
+add_uds_test(lin-sim test/test_lin_sim.c test/lin_sim/lin_master_sim.c test/mock/mock_uart.c test/mock/mock_timer.c)
 
 # ============================================================
 # Simulator Executable Target (links mock HAL for PC execution)
@@ -438,72 +207,16 @@ add_uds_warnings(uds-sim)
 # ============================================================
 # UDS Runner / Scaffolding Test
 # ============================================================
-add_executable(uds-runner-test
-    test/test_uds_runner.c
-)
-
-target_link_libraries(uds-runner-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-runner-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-)
-
-add_test(NAME uds-runner-test COMMAND uds-runner-test)
-
-add_uds_warnings(uds-runner-test)
-add_uds_test_config(uds-runner-test)
+add_uds_test(runner test/test_uds_runner.c)
 
 # ============================================================
 # Integration Test Runner (Wave 4 Task 21)
 # ============================================================
 # End-to-end pipeline test: mock UART -> LIN decode -> UDS
 # parse -> service dispatch -> response serialize -> LIN encode.
-add_executable(uds-integration-test
-    test/test_uds_integration.c
-    test/mock/mock_uart.c
-    test/mock/mock_timer.c
-    test/mock/mock_nvm.c
-)
-
-target_link_libraries(uds-integration-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-integration-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-integration-test COMMAND uds-integration-test)
-
-add_uds_warnings(uds-integration-test)
-add_uds_test_config(uds-integration-test)
+add_uds_test(integration test/test_uds_integration.c test/mock/mock_uart.c test/mock/mock_timer.c test/mock/mock_nvm.c)
 
 # ============================================================
 # Service Dispatch Tests (Wave 3d Task 18)
 # ============================================================
-add_executable(uds-service-test
-    test/test_svc_service.c
-    test/mock/mock_timer.c
-)
-
-target_link_libraries(uds-service-test PRIVATE
-    uds-core
-    unity
-)
-
-target_include_directories(uds-service-test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/test
-    ${CMAKE_CURRENT_SOURCE_DIR}/test/mock
-    ${CMAKE_CURRENT_SOURCE_DIR}/inc
-)
-
-add_test(NAME uds-service-test COMMAND uds-service-test)
-
-add_uds_warnings(uds-service-test)
-add_uds_test_config(uds-service-test)
+add_uds_test(service test/test_svc_service.c test/mock/mock_timer.c)
