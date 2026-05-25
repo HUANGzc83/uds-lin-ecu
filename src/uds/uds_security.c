@@ -16,35 +16,38 @@
 /* ======================================================================== *
  * LFSR Seed Generation                                                     *
  * ======================================================================== *
- * Simple 16-bit LFSR (x^16 + x^14 + x^13 + x^11 + 1) for deterministic
- * pseudo-random seed generation.  The LFSR is re-initialised per level
- * so that different security levels produce different seed sequences.
+ * Default 32-bit LFSR (x^32 + x^22 + x^2 + x^1 + 1, polynomial 0x80200003)
+ * for deterministic pseudo-random seed generation. The LFSR is
+ * re-initialised per level so that different security levels produce
+ * different seed sequences.
+ *
+ * Default LFSR is for demonstration only.
  * ======================================================================== */
 
-/** @brief LFSR polynomial taps: bits 0, 2, 3, 5 (0-indexed). */
-#define LFSR_TAP_0  0u
-#define LFSR_TAP_1  2u
-#define LFSR_TAP_2  3u
-#define LFSR_TAP_3  5u
-
 /** @brief Global LFSR state, advanced after each seed generation. */
-static uint16_t lfsr_state;
+static uint32_t lfsr_state;
 
 /**
- * @brief Initialise the LFSR with a given security level.
+ * @brief Initialise the LFSR with a given 32-bit seed.
  *
- * Mixes the level number into the initial state so that different levels
- * produce distinct seed sequences.
- *
- * @param[in]  level  Security level number (1-based)
+ * @param[in]  seed  32-bit seed value
  */
-static void lfsr_init(uint8_t level)
+static void lfsr_init(uint32_t seed)
 {
-    lfsr_state = 0xACE1u ^ ((uint16_t)level << 8);
+    lfsr_state = seed;
+    /* LFSR with all zeros would lock up — ensure non-zero state */
+    if (lfsr_state == 0u)
+    {
+        lfsr_state = 0xACE1ACE1u;
+    }
 }
 
 /**
  * @brief Generate and return a single pseudo-random byte from the LFSR.
+ *
+ * Advances the 32-bit LFSR (right-shifting Galois, polynomial 0x80200003)
+ * by 8 steps and collects the shifted-out bit from each step into the
+ * result byte (MSB first).
  *
  * @return Next pseudo-random byte
  */
@@ -54,13 +57,14 @@ static uint8_t lfsr_next_byte(void)
 
     for (uint8_t i = 0u; i < 8u; i++)
     {
-        /* Compute feedback: XOR of selected tap bits */
-        uint16_t bit = ((lfsr_state >> LFSR_TAP_0) ^
-                        (lfsr_state >> LFSR_TAP_1) ^
-                        (lfsr_state >> LFSR_TAP_2) ^
-                        (lfsr_state >> LFSR_TAP_3)) & 1u;
-        lfsr_state = (lfsr_state >> 1u) | (bit << 15u);
-        result     = (uint8_t)((result << 1u) | (uint8_t)bit);
+        result <<= 1u;
+        uint32_t bit = lfsr_state & 1u;
+        result      |= (uint8_t)bit;
+        lfsr_state >>= 1u;
+        if (bit != 0u)
+        {
+            lfsr_state ^= 0x80200003u;
+        }
     }
 
     return result;
@@ -75,7 +79,7 @@ static uint8_t lfsr_next_byte(void)
  */
 static void generate_seed(uint8_t level, uint8_t *buf, uint8_t len)
 {
-    lfsr_init(level);
+    lfsr_init(0xACE1ACE1u ^ ((uint32_t)level << 16u) ^ (uint32_t)level);
     for (uint8_t i = 0u; i < len; i++)
     {
         buf[i] = lfsr_next_byte();
@@ -144,16 +148,19 @@ static uint8_t subfn_to_level(uint8_t subfn)
 /**
  * @brief Default key validation callback.
  *
- * Returns true if key[0] == ~seed[0] (simple complement).
- * This is intended for testing/reference only — real applications should
- * install a cryptographically sound callback via uds_security_set_key_validate_cb().
+ * Computes CRC-8 over the seed buffer, then validates that the XOR
+ * accumulator over the key buffer bytes matches the seed CRC-8 value.
+ * This is intended for demonstration/reference only — real applications
+ * should install a cryptographically sound callback.
+ *
+ * Default LFSR is for demonstration only.
  *
  * @param[in]  level     Security level number (1-based, unused)
  * @param[in]  seed      Seed buffer from requestSeed
  * @param[in]  seed_len  Length of seed in bytes
  * @param[in]  key       Key buffer from sendKey
  * @param[in]  key_len   Length of key in bytes
- * @return true if key[0] == ~seed[0], false otherwise
+ * @return true if XOR accumulator of key matches CRC-8 of seed, false otherwise
  */
 static bool default_key_validate(uint8_t       level,
                                  const uint8_t *seed,
@@ -162,15 +169,38 @@ static bool default_key_validate(uint8_t       level,
                                  uint8_t       key_len)
 {
     (void)level;
-    (void)key_len;
 
-    /* Trivial validation: key[0] must be the bitwise complement of seed[0] */
-    if (seed_len == 0u)
+    if (seed_len == 0u || key_len == 0u)
     {
         return false;
     }
 
-    return (key[0] == (uint8_t)(~seed[0]));
+    /* Compute CRC-8 over seed buffer (polynomial 0x07, init 0xFF) */
+    uint8_t crc = 0xFFu;
+    for (uint8_t i = 0u; i < seed_len; i++)
+    {
+        crc ^= seed[i];
+        for (uint8_t j = 0u; j < 8u; j++)
+        {
+            if (crc & 0x80u)
+            {
+                crc = (uint8_t)((crc << 1u) ^ 0x07u);
+            }
+            else
+            {
+                crc <<= 1u;
+            }
+        }
+    }
+
+    /* XOR accumulator over key bytes must match seed CRC-8 */
+    uint8_t key_xor = 0u;
+    for (uint8_t k = 0u; k < key_len; k++)
+    {
+        key_xor ^= key[k];
+    }
+
+    return (key_xor == crc);
 }
 
 /**

@@ -21,6 +21,34 @@
 #include <string.h>
 
 /* ======================================================================== *
+ * CRC-8 Helper (matches default_key_validate in uds_security.c)            *
+ * ======================================================================== */
+
+/**
+ * @brief Compute CRC-8 over a buffer (polynomial 0x07, init 0xFF).
+ */
+static uint8_t crc8(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0xFFu;
+    for (uint8_t i = 0u; i < len; i++)
+    {
+        crc ^= data[i];
+        for (uint8_t j = 0u; j < 8u; j++)
+        {
+            if (crc & 0x80u)
+            {
+                crc = (uint8_t)((crc << 1u) ^ 0x07u);
+            }
+            else
+            {
+                crc <<= 1u;
+            }
+        }
+    }
+    return crc;
+}
+
+/* ======================================================================== *
  * Test Fixture                                                             *
  * ======================================================================== */
 
@@ -112,14 +140,14 @@ static void prepare_session_and_security(uint8_t session_type)
     }
 
     /* Step 2: Request seed */
-    uint8_t seed0;
+    uint8_t seed_buf[SECURITY_SEED_SIZE];
     {
         uds_response_t rsp;
         uint8_t raw[] = {0x27, 0x01};
         uds_request_t req;
         TEST_ASSERT_EQUAL(UDS_OK, uds_parse_request(raw, sizeof(raw), &req));
         uds_svc_security_access(&req, &rsp, &unlocked);
-        seed0 = rsp.data[0];
+        memcpy(seed_buf, rsp.data, SECURITY_SEED_SIZE);
     }
 
     /* Step 3: Send valid key */
@@ -127,8 +155,8 @@ static void prepare_session_and_security(uint8_t session_type)
         uint8_t raw[2 + SECURITY_SEED_SIZE];
         raw[0] = 0x27;
         raw[1] = 0x02;
-        memset(raw + 2, 0xAA, SECURITY_SEED_SIZE);
-        raw[2] = (uint8_t)(~seed0);
+        memset(raw + 2, 0x00, SECURITY_SEED_SIZE);
+        raw[2] = crc8(seed_buf, SECURITY_SEED_SIZE);
 
         uds_response_t rsp;
         uds_request_t req;

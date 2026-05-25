@@ -34,6 +34,34 @@
 #include <string.h>
 
 /* ======================================================================== *
+ * CRC-8 Helper (matches default_key_validate in uds_security.c)            *
+ * ======================================================================== */
+
+/**
+ * @brief Compute CRC-8 over a buffer (polynomial 0x07, init 0xFF).
+ */
+static uint8_t crc8(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0xFFu;
+    for (uint8_t i = 0u; i < len; i++)
+    {
+        crc ^= data[i];
+        for (uint8_t j = 0u; j < 8u; j++)
+        {
+            if (crc & 0x80u)
+            {
+                crc = (uint8_t)((crc << 1u) ^ 0x07u);
+            }
+            else
+            {
+                crc <<= 1u;
+            }
+        }
+    }
+    return crc;
+}
+
+/* ======================================================================== *
  * Test Fixture — Global State                                              *
  * ======================================================================== */
 
@@ -624,8 +652,8 @@ void test_full_diag_session_lifecycle(void)
 
     /* ---- Step 3: 0x27 0x02 <key> -> send key, unlock ---- */
     {
-        /* key = ~seed[0]; seed bytes start at rsp[2] */
-        uint8_t key = (uint8_t)(~rsp[2]);
+        /* key = CRC-8 of seed; seed bytes start at rsp[2] */
+        uint8_t key = crc8(rsp + 2, SECURITY_SEED_SIZE);
         uint8_t req[] = {0x27, 0x02, key};
         int result = round_trip_uds(req, sizeof(req), rsp, &rsp_len);
         TEST_ASSERT(result > 0);
@@ -698,7 +726,7 @@ void test_dtc_lifecycle(void)
         uint8_t req[] = {0x27, 0x01};
         int result = round_trip_uds(req, sizeof(req), rsp, &rsp_len);
         TEST_ASSERT(result > 0);
-        uint8_t key = (uint8_t)(~rsp[2]);
+        uint8_t key = crc8(rsp + 2, SECURITY_SEED_SIZE);
         uint8_t key_req[] = {0x27, 0x02, key};
         (void)round_trip_uds(key_req, sizeof(key_req), rsp, &rsp_len);
         TEST_ASSERT_TRUE(g_sim_ctx.unlocked);
@@ -778,7 +806,7 @@ void test_upload_download_cycle(void)
         uint8_t req[] = {0x27, 0x01};
         int result = round_trip_uds(req, sizeof(req), rsp, &rsp_len);
         TEST_ASSERT(result > 0);
-        uint8_t key = (uint8_t)(~rsp[2]);
+        uint8_t key = crc8(rsp + 2, SECURITY_SEED_SIZE);
         uint8_t key_req[] = {0x27, 0x02, key};
         (void)round_trip_uds(key_req, sizeof(key_req), rsp, &rsp_len);
         TEST_ASSERT_TRUE(g_sim_ctx.unlocked);

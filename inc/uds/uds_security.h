@@ -48,6 +48,7 @@ extern "C" {
 /**
  * @brief Size of the seed value in bytes.
  *
+ * The default LFSR generates SECURITY_SEED_SIZE bytes per request.
  * Default: 8
  */
 #ifndef SECURITY_SEED_SIZE
@@ -57,6 +58,7 @@ extern "C" {
 /**
  * @brief Size of the key value in bytes.
  *
+ * The default CRC-8 key validation operates over the full key buffer.
  * Default: 8
  */
 #ifndef SECURITY_KEY_SIZE

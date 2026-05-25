@@ -17,6 +17,34 @@
 #include <string.h>
 
 /* ======================================================================== *
+ * CRC-8 Helper (matches default_key_validate in uds_security.c)            *
+ * ======================================================================== */
+
+/**
+ * @brief Compute CRC-8 over a buffer (polynomial 0x07, init 0xFF).
+ */
+static uint8_t crc8(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0xFFu;
+    for (uint8_t i = 0u; i < len; i++)
+    {
+        crc ^= data[i];
+        for (uint8_t j = 0u; j < 8u; j++)
+        {
+            if (crc & 0x80u)
+            {
+                crc = (uint8_t)((crc << 1u) ^ 0x07u);
+            }
+            else
+            {
+                crc <<= 1u;
+            }
+        }
+    }
+    return crc;
+}
+
+/* ======================================================================== *
  * Test Fixture                                                             *
  * ======================================================================== */
 
@@ -276,14 +304,15 @@ void test_security_send_key_valid_unlocks(void)
                      uds_svc_security_access);
         TEST_ASSERT_EQUAL_UINT8(SECURITY_SEED_SIZE, rsp.data_len);
 
-        /* Step 2: build valid key (key[0] = ~seed[0]) */
-        uint8_t seed0 = rsp.data[0];
+        /* Step 2: build valid key (XOR accumulator of key == CRC-8 of seed) */
+        uint8_t seed_buf[SECURITY_SEED_SIZE];
+        memcpy(seed_buf, rsp.data, SECURITY_SEED_SIZE);
 
         uint8_t raw2[2 + SECURITY_SEED_SIZE];
         raw2[0] = 0x27;
         raw2[1] = 0x02;  /* sendKey level 1 */
-        memset(raw2 + 2, 0xAA, SECURITY_SEED_SIZE);
-        raw2[2] = (uint8_t)(~seed0);
+        memset(raw2 + 2, 0x00, SECURITY_SEED_SIZE);
+        raw2[2] = crc8(seed_buf, SECURITY_SEED_SIZE);
 
         uds_response_t rsp2;
         bool result = call_handler(raw2, sizeof(raw2), &rsp2, &unlocked,

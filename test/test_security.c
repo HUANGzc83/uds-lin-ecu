@@ -52,6 +52,32 @@ void tearDown(void)
 static uint8_t  seed_buf[SECURITY_SEED_SIZE];
 static uint8_t  key_buf[SECURITY_KEY_SIZE];
 
+/**
+ * @brief Compute CRC-8 over a buffer (polynomial 0x07, init 0xFF).
+ *
+ * Matches the CRC-8 used in the default key validation callback.
+ */
+static uint8_t crc8(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0xFFu;
+    for (uint8_t i = 0u; i < len; i++)
+    {
+        crc ^= data[i];
+        for (uint8_t j = 0u; j < 8u; j++)
+        {
+            if (crc & 0x80u)
+            {
+                crc = (uint8_t)((crc << 1u) ^ 0x07u);
+            }
+            else
+            {
+                crc <<= 1u;
+            }
+        }
+    }
+    return crc;
+}
+
 /* ======================================================================== *
  * 1. Init → locked, counters zero, delay not active                       *
  * ======================================================================== */
@@ -99,9 +125,9 @@ void test_send_key_valid_unlocks(void)
     uds_security_request_seed(REQ_LEVEL1, seed_buf, &len, &nrc);
     TEST_ASSERT_EQUAL(NRC_POSITIVE_RESPONSE, nrc);
 
-    /* Build valid key: key[0] = ~seed[0]; rest arbitrary */
-    memset(key_buf, 0xAA, sizeof(key_buf));
-    key_buf[0] = (uint8_t)(~seed_buf[0]);
+    /* Build valid key: XOR accumulator of key must match CRC-8 of seed */
+    memset(key_buf, 0x00, sizeof(key_buf));
+    key_buf[0] = crc8(seed_buf, SECURITY_SEED_SIZE);
 
     status = uds_security_send_key(KEY_LEVEL1, key_buf, sizeof(key_buf), &nrc);
 
@@ -165,7 +191,8 @@ void test_request_seed_already_unlocked_returns_zero(void)
 
     /* Unlock level 1 first */
     uds_security_request_seed(REQ_LEVEL1, seed_buf, &len, &nrc);
-    key_buf[0] = (uint8_t)(~seed_buf[0]);
+    memset(key_buf, 0x00, sizeof(key_buf));
+    key_buf[0] = crc8(seed_buf, SECURITY_SEED_SIZE);
     uds_security_send_key(KEY_LEVEL1, key_buf, sizeof(key_buf), &nrc);
     TEST_ASSERT_TRUE(uds_security_is_unlocked());
 
@@ -290,7 +317,8 @@ void test_lock_relocks(void)
 
     /* Unlock level 1 */
     uds_security_request_seed(REQ_LEVEL1, seed_buf, &len, &nrc);
-    key_buf[0] = (uint8_t)(~seed_buf[0]);
+    memset(key_buf, 0x00, sizeof(key_buf));
+    key_buf[0] = crc8(seed_buf, SECURITY_SEED_SIZE);
     uds_security_send_key(KEY_LEVEL1, key_buf, sizeof(key_buf), &nrc);
     TEST_ASSERT_TRUE(uds_security_is_unlocked());
 
@@ -311,7 +339,8 @@ void test_multiple_levels_independent(void)
 
     /* Unlock level 1 */
     uds_security_request_seed(REQ_LEVEL1, seed_buf, &len, &nrc);
-    key_buf[0] = (uint8_t)(~seed_buf[0]);
+    memset(key_buf, 0x00, sizeof(key_buf));
+    key_buf[0] = crc8(seed_buf, SECURITY_SEED_SIZE);
     uds_security_send_key(KEY_LEVEL1, key_buf, sizeof(key_buf), &nrc);
     TEST_ASSERT_TRUE(uds_security_is_unlocked());
     TEST_ASSERT_FALSE(uds_security_is_locked_for_level(REQ_LEVEL1));
@@ -321,7 +350,8 @@ void test_multiple_levels_independent(void)
 
     /* Unlock level 2 independently */
     uds_security_request_seed(REQ_LEVEL2, seed_buf, &len, &nrc);
-    key_buf[0] = (uint8_t)(~seed_buf[0]);
+    memset(key_buf, 0x00, sizeof(key_buf));
+    key_buf[0] = crc8(seed_buf, SECURITY_SEED_SIZE);
     uds_security_send_key(KEY_LEVEL2, key_buf, sizeof(key_buf), &nrc);
     TEST_ASSERT_FALSE(uds_security_is_locked_for_level(REQ_LEVEL2));
 
