@@ -13,6 +13,21 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* ======================================================================== *
+ * Compiler Portability Shim — Packed Struct Attribute                       *
+ * ======================================================================== */
+
+#if defined(__GNUC__) || defined(__clang__)
+#define UDS_PACKED __attribute__((packed))
+#elif defined(_MSC_VER)
+#define UDS_PACKED __pragma(pack(push, 1))
+#elif defined(__ARMCC_VERSION)
+#define UDS_PACKED __attribute__((packed))
+#else
+#define UDS_PACKED
+#warning "UDS_PACKED not defined for this compiler"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -167,7 +182,7 @@ typedef enum {
  * ======================================================================== */
 
 /** @brief UDS subfunction parameter byte (bit 7 = suppressPosRspMsgIndicationBit) */
-typedef struct __attribute__((packed)) {
+typedef struct UDS_PACKED {
     uint8_t value        : 7; /**< @brief Subfunction value (bits 6:0) */
     uint8_t suppress_rsp : 1; /**< @brief Suppress positive response indication (bit 7) */
 } uds_subfunction_t;
