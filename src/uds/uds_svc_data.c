@@ -284,7 +284,7 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
         return true;
     }
 
-    bool unlocked = *((const bool *)context);
+    bool unlocked = *UDS_CTX_UNLOCKED(context);
 
     /* --- IMLOIF: need at least 1 byte data (DID high lost in subfunction) --- */
     /* After parser: data points to raw+2 (DID low byte). We reconstruct DID
@@ -420,7 +420,7 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
         return true;
     }
 
-    bool unlocked = *((const bool *)context);
+    bool unlocked = *UDS_CTX_UNLOCKED(context);
 
     /* --- IMLOIF: need at least 1 byte data --- */
     if (req->data_len < 1 || req->data == NULL)
@@ -732,7 +732,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
         return true;
     }
 
-    bool unlocked = *((const bool *)context);
+    bool unlocked = *UDS_CTX_UNLOCKED(context);
 
     /* --- IMLOIF: need at least 1 byte data (DID high in byte[1], DID low in data[0]) --- */
     if (req->data_len < 1 || req->data == NULL)
@@ -808,7 +808,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
         return true;
     }
 
-    bool unlocked = *((const bool *)context);
+    bool unlocked = *UDS_CTX_UNLOCKED(context);
 
     /* --- SAD: security must be unlocked --- */
     if (!unlocked)

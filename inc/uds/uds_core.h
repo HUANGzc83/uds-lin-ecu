@@ -344,6 +344,59 @@ bool uds_is_positive_response(const uint8_t *data);
  */
 uint8_t uds_sid_to_response_sid(uint8_t sid);
 
+/* ======================================================================== *
+ * Type-Safe Service Context Dispatch — Wave 2 Task 11                      *
+ * ======================================================================== */
+
+/* Forward declaration — full type defined in uds_session.h */
+struct uds_session_context;
+
+/**
+ * @brief Wrapper union for type-safe service context dispatch.
+ *
+ * UDS service handlers receive a raw @c void* context for backward
+ * compatibility.  This union provides named, compiler-checked access
+ * to the expected context type.  Callers opt in by passing a pointer to
+ * a @ref uds_context_t instead of a raw pointer.
+ *
+ * @code
+ *   // Caller-side (opt-in type safety):
+ *   uds_context_t ctx = { .session = &my_session };
+ *   handler(req, rsp, &ctx);
+ *
+ *   // Handler-side (backward-compatible macros work with void*):
+ *   uds_session_context_t *sctx = UDS_CTX_SESSION(context);
+ *   bool unlocked = *UDS_CTX_UNLOCKED(context);
+ * @endcode
+ */
+typedef union {
+    struct uds_session_context *session;  /**< @brief Session state context pointer */
+    bool                       *unlocked; /**< @brief Security unlock flag pointer */
+    void                       *raw;      /**< @brief Raw void-pointer passthrough */
+} uds_context_t;
+
+/**
+ * @brief Cast handler @c void* context to a session context pointer.
+ *
+ * Backward-compatible with both raw @c void* and @ref uds_context_t
+ * calling conventions.
+ *
+ * @param ctx  The @c void* context parameter (or @ref uds_context_t*)
+ * @return @c struct uds_session_context*  (the session state pointer)
+ */
+#define UDS_CTX_SESSION(ctx)     ((struct uds_session_context *)(void*)(ctx))
+
+/**
+ * @brief Cast handler @c void* context to an unlocked flag pointer.
+ *
+ * Backward-compatible with both raw @c void* and @ref uds_context_t
+ * calling conventions.
+ *
+ * @param ctx  The @c void* context parameter (or @ref uds_context_t*)
+ * @return @c bool*  (the security unlock flag pointer)
+ */
+#define UDS_CTX_UNLOCKED(ctx)    ((bool *)(void*)(ctx))
+
 #ifdef __cplusplus
 }
 #endif

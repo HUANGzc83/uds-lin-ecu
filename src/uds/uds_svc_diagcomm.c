@@ -185,7 +185,7 @@ bool uds_svc_diagnostic_session_control(const uds_request_t *req,
         return true;
     }
 
-    uds_session_context_t *sctx = (uds_session_context_t *)context;
+    uds_session_context_t *sctx = UDS_CTX_SESSION(context);
     uint8_t session_type = req->subfunction.value;
 
     /* --- IMLOIF: no additional data bytes expected --- */
@@ -349,7 +349,7 @@ bool uds_svc_security_access(const uds_request_t *req,
         /* Update caller's unlock flag if context provided */
         if (context != NULL)
         {
-            *((bool *)context) = true;
+            *UDS_CTX_UNLOCKED(context) = true;
         }
 
         /* --- SPRMIB check --- */
@@ -458,7 +458,7 @@ bool uds_svc_control_dtc_setting(const uds_request_t *req,
         return true;
     }
 
-    bool unlocked = *((const bool *)context);
+    bool unlocked = *UDS_CTX_UNLOCKED(context);
 
     /* --- SAD: security must be unlocked --- */
     if (!unlocked)

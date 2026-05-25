@@ -23,7 +23,7 @@ extern "C" {
  * ======================================================================== */
 
 /** @brief Session context holding current diagnostic session state */
-typedef struct {
+typedef struct uds_session_context {
     uint8_t          current_session; /**< @brief Current active session ID (UDS_DEFAULT_SESSION, etc.) */
     uds_std_return_t params;          /**< @brief Timing parameters for the current session */
     bool             events_paused;   /**< @brief Events paused flag (set when entering non-default session) */
