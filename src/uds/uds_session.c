@@ -24,15 +24,17 @@
  *   extendedSession  (0x03): P2=5000ms,  P2*=5000ms
  */
 typedef struct {
-    uint8_t  session;           /**< @brief Session type identifier */
-    uint16_t p2_server_max;     /**< @brief P2Server_max in milliseconds */
-    uint16_t p2_star_server_max; /**< @brief P2StarServer_max in milliseconds */
+    uint8_t          session; /**< @brief Session type identifier */
+    uds_std_return_t params;  /**< @brief Session timing parameters (P2, P2*) */
 } session_param_entry_t;
 
 static const session_param_entry_t session_params_table[] = {
-    {UDS_DEFAULT_SESSION,      50,   5000},
-    {UDS_PROGRAMMING_SESSION,  5000, 5000},
-    {UDS_EXTENDED_SESSION,     5000, 5000},
+    {.session = UDS_DEFAULT_SESSION,
+     .params  = {.p2_server_max = 50,   .p2_star_server_max = 5000}},
+    {.session = UDS_PROGRAMMING_SESSION,
+     .params  = {.p2_server_max = 5000, .p2_star_server_max = 5000}},
+    {.session = UDS_EXTENDED_SESSION,
+     .params  = {.p2_server_max = 5000, .p2_star_server_max = 5000}},
 };
 
 #define SESSION_PARAMS_COUNT  (sizeof(session_params_table) / sizeof(session_params_table[0]))
@@ -96,8 +98,8 @@ uds_status_t uds_session_switch(uds_session_context_t *ctx,
         const session_param_entry_t *entry = find_session_entry(new_session);
         if (entry != NULL)
         {
-            ctx->params.p2_server_max     = entry->p2_server_max;
-            ctx->params.p2_star_server_max = entry->p2_star_server_max;
+            ctx->params.p2_server_max     = entry->params.p2_server_max;
+            ctx->params.p2_star_server_max = entry->params.p2_star_server_max;
         }
         return UDS_OK;
     }
@@ -128,8 +130,8 @@ uds_status_t uds_session_switch(uds_session_context_t *ctx,
     const session_param_entry_t *entry = find_session_entry(new_session);
     if (entry != NULL)
     {
-        ctx->params.p2_server_max     = entry->p2_server_max;
-        ctx->params.p2_star_server_max = entry->p2_star_server_max;
+        ctx->params.p2_server_max     = entry->params.p2_server_max;
+        ctx->params.p2_star_server_max = entry->params.p2_star_server_max;
     }
 
     return UDS_OK;
