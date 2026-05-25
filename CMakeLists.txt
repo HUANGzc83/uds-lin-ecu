@@ -33,8 +33,41 @@ set(CMAKE_C_EXTENSIONS OFF)
 # Compiler Warnings (applied per-target)
 # ============================================================
 macro(add_uds_warnings TARGET)
-    target_compile_options(${TARGET} PRIVATE -Wall -Werror)
+    target_compile_options(${TARGET} PRIVATE
+        -Wall
+        -Werror
+        -Wextra
+        -Wshadow
+        -Wconversion
+        -Wpedantic
+        -Wstrict-prototypes
+        -Wmissing-prototypes
+        -Wformat=2
+        -Wno-unused-parameter
+        -Wno-missing-prototypes
+        -Wno-sign-compare
+        -Wno-conversion
+        -Wno-type-limits
+    )
 endmacro()
+
+# ============================================================
+# Sanitizer Options
+# ============================================================
+option(UDS_ASAN  "Enable AddressSanitizer" OFF)
+option(UDS_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
+
+if(UDS_ASAN)
+    set(SANITIZER_FLAGS "-fsanitize=address" "-fno-omit-frame-pointer")
+    add_compile_options(${SANITIZER_FLAGS})
+    add_link_options(${SANITIZER_FLAGS})
+endif()
+
+if(UDS_UBSAN)
+    set(SANITIZER_FLAGS "-fsanitize=undefined")
+    add_compile_options(${SANITIZER_FLAGS})
+    add_link_options(${SANITIZER_FLAGS})
+endif()
 
 # Force-include Unity configuration for test executables
 # (CMake 4.x drops function-style -D macro definitions on the command line)
