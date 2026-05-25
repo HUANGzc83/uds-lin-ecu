@@ -16,6 +16,16 @@
 #include "uds/uds_data.h"
 #include <string.h>   /* memset, memcpy */
 
+/** @brief Default memory region size for Read/WriteMemoryByAddress (1 KB) */
+#define UDS_DEFAULT_MEM_REGION_SIZE  0x000003FFu
+
+/** @brief Scaling data constants for ReadScalingDataByIdentifier */
+#define SCALE_FACTOR_HIGH  0x01u /**< scale = 0x0100 = 1.0 in fixed-point */
+#define SCALE_FACTOR_LOW   0x00u
+#define SCALE_OFFSET_HIGH  0x00u /**< offset = 0x0000 */
+#define SCALE_OFFSET_LOW   0x00u
+#define SCALE_UNIT         0x01u /**< unit identifier */
+
 /** @brief Simulated RAM buffer for Read/WriteMemoryByAddress */
 static uint8_t g_memory_buf[MEMORY_BUF_SIZE];
 
@@ -494,11 +504,11 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
         return true;
     }
 
-    rsp_buf[2 + did_data_len + 0] = 0x01; /* scale factor high */
-    rsp_buf[2 + did_data_len + 1] = 0x00; /* scale factor low */
-    rsp_buf[2 + did_data_len + 2] = 0x00; /* offset high */
-    rsp_buf[2 + did_data_len + 3] = 0x00; /* offset low */
-    rsp_buf[2 + did_data_len + 4] = 0x01; /* unit */
+    rsp_buf[2 + did_data_len + 0] = SCALE_FACTOR_HIGH;
+    rsp_buf[2 + did_data_len + 1] = SCALE_FACTOR_LOW;
+    rsp_buf[2 + did_data_len + 2] = SCALE_OFFSET_HIGH;
+    rsp_buf[2 + did_data_len + 3] = SCALE_OFFSET_LOW;
+    rsp_buf[2 + did_data_len + 4] = SCALE_UNIT;
 
     set_pos_rsp(rsp, READ_SCALING_DATA_BY_ID_RSP, 0,
                 rsp_buf, 2 + scaling_len);
@@ -912,7 +922,7 @@ void uds_svc_data_init(void)
     memset(g_periodic_dids, 0, sizeof(g_periodic_dids));
 
     uds_memory_regions_clear();
-    uds_register_memory_region(0x00000000, 0x000003FF, g_memory_buf);
+    uds_register_memory_region(0x00000000, UDS_DEFAULT_MEM_REGION_SIZE, g_memory_buf);
 }
 
 uint8_t* uds_svc_data_get_memory_buf(void)

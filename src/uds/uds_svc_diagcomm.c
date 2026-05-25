@@ -23,6 +23,11 @@
 #include "uds/uds_security.h"
 #include <string.h>   /* memset, memcpy */
 
+/** @brief ECU reset type subfunction values (ISO 14229-1 Table 45) */
+#define ECU_RESET_HARD        0x01u /**< hardReset — simulates power-on reset */
+#define ECU_RESET_KEY_OFF_ON  0x02u /**< keyOffOnReset — ignition cycle reset  */
+#define ECU_RESET_SOFT        0x03u /**< softReset — software-initiated reset  */
+
 /** @brief Static array of event records */
 static uds_event_record_t g_event_store[UDS_EVENT_STORE_MAX];
 
@@ -98,9 +103,9 @@ static inline bool should_suppress(const uds_request_t *req)
  */
 static bool is_reset_type_supported(uint8_t reset_type)
 {
-    return (reset_type == 0x01u ||
-            reset_type == 0x02u ||
-            reset_type == 0x03u);
+    return (reset_type == ECU_RESET_HARD ||
+            reset_type == ECU_RESET_KEY_OFF_ON ||
+            reset_type == ECU_RESET_SOFT);
 }
 
 /* ======================================================================== *

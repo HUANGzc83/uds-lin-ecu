@@ -24,6 +24,9 @@
  * Default LFSR is for demonstration only.
  * ======================================================================== */
 
+/** @brief Default LFSR initialisation seed (avoids all-zero lock-up) */
+#define LFSR_DEFAULT_SEED  0xACE1ACE1u
+
 /** @brief Global LFSR state, advanced after each seed generation. */
 static uint32_t lfsr_state;
 
@@ -38,7 +41,7 @@ static void lfsr_init(uint32_t seed)
     /* LFSR with all zeros would lock up — ensure non-zero state */
     if (lfsr_state == 0u)
     {
-        lfsr_state = 0xACE1ACE1u;
+        lfsr_state = LFSR_DEFAULT_SEED;
     }
 }
 

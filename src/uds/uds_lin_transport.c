@@ -32,6 +32,9 @@
 /** @brief Sequence number range (1..15 per ISO 17987-3) */
 #define LIN_CF_SEQ_MAX       15
 
+/** @brief Upper reserved bytes in LIN frame data (data[4..7] = sizeof(uint32_t)) */
+#define LIN_FRAME_UPPER_RESERVED_SIZE  (sizeof(uint32_t))
+
 /* ======================================================================== *
  * Static Context Pool                                                       *
  * ======================================================================== */
@@ -403,7 +406,7 @@ lin_status_t lin_tx_encode_fc_ctx(lin_transport_ctx_t *ctx,
     if (frame == NULL || params == NULL)
         return LIN_PCI_ERROR;
 
-    (void)memset(frame->data, 0, LIN_FRAME_SIZE);
+    (void)memset(&frame->data[4], 0, LIN_FRAME_UPPER_RESERVED_SIZE);
     frame->data[0] = nad;
     frame->data[1] = LIN_PCI_FC | (uint8_t)params->fc_status;
     frame->data[2] = (uint8_t)params->fc_status;
