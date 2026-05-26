@@ -196,7 +196,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   align-items: center; justify-content: center; font-size: .75rem;
   border: 1px solid var(--border); cursor: pointer; transition: all .15s; position: relative; }
 .hex-cell .val { font-family: monospace; font-weight: 600; font-size: .8rem; }
-.hex-cell .label { font-size: .55rem; color: var(--text2); max-width: 40px;
+.hex-cell .label { font-size: .55rem; max-width: 40px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 .hex-cell:hover { transform: scale(1.15); z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
 .hex-cell.sid { background: #dbeafe; color: #1e40af; }
@@ -206,10 +206,31 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .dark .hex-cell.sid { background: #1e3a5f; color: #93c5fd; }
 .dark .hex-cell.nrc { background: #7f1d1d; color: #fca5a5; }
 .dark .hex-cell.session { background: #064e3b; color: #6ee7b7; }
+.dark .hex-cell.reserved { background: #1a2332; color: #94a3b8; }
+.dark .hex-cell .label { opacity: .85; }
 
 .legend { display: flex; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: .8rem; }
 .legend-dot { width: 14px; height: 14px; border-radius: 3px; }
+.legend-dot.sid { background: #dbeafe; }
+.legend-dot.nrc { background: #fee2e2; }
+.legend-dot.session { background: #d1fae5; }
+.legend-dot.reserved { background: var(--code-bg); }
+.dark .legend-dot.sid { background: #1e3a5f; }
+.dark .legend-dot.nrc { background: #7f1d1d; }
+.dark .legend-dot.session { background: #064e3b; }
+.dark .legend-dot.reserved { background: #334155; }
+
+.lin-legend-dot.nad { background: #dbeafe; }
+.lin-legend-dot.pci { background: #fef3c7; }
+.lin-legend-dot.uds { background: #d1fae5; }
+.lin-legend-dot.fc { background: #fce7f3; }
+.lin-legend-dot.unused { background: var(--code-bg); }
+.dark .lin-legend-dot.nad { background: #1e3a5f; }
+.dark .lin-legend-dot.pci { background: #422006; }
+.dark .lin-legend-dot.uds { background: #064e3b; }
+.dark .lin-legend-dot.fc { background: #4c0519; }
+.dark .lin-legend-dot.unused { background: #334155; }
 
 /* ===== Learning Tool: Message Builder ===== */
 .builder-row { display: flex; align-items: center; gap: 8px; margin: .5rem 0;
@@ -229,6 +250,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .dark .byte-display .byte.sf-byte { background: #422006; }
 .byte-display .byte.data-byte { border-color: var(--success); background: #d1fae5; }
 .dark .byte-display .byte.data-byte { background: #064e3b; }
+/* NRC bytes — negative response */
+.byte-display .byte.nrc { border-color: var(--danger); background: #fee2e2; color: #991b1b; }
+.dark .byte-display .byte.nrc { background: #7f1d1d; color: #fca5a5; }
+.byte.nrc { border-color: var(--danger); background: #fee2e2; color: #991b1b; font-weight: 700; }
+.dark .byte.nrc { background: #7f1d1d; color: #fca5a5; }
 
 /* ===== Learning Tool: Session Service Tag Colors ===== */
 .svc-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px;
@@ -248,11 +274,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .dark .svc-tag.excl-ext { background: #1e3a5f; color: #93c5fd; border-color: #1e40af; }
 .dark .svc-tag.excl-default { background: #2e1065; color: #c4b5fd; border-color: #5b21b6; }
 
-.legend-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 1rem; font-size: .75rem; }
+.legend-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 1rem; font-size: .75rem; padding: .6rem .8rem; background: var(--card2); border-radius: 8px; }
 .legend-row .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block;
   margin-right: 4px; }
+.dot.common { background: #94a3b8; }
+.dot.shared-prog { background: #f97316; }     /* orange - shared with programming */
+.dot.shared-ext { background: #14b8a6; }      /* teal - shared with extended */
+.dot.excl-prog { background: #dc2626; }        /* red */
+.dot.excl-ext { background: #2563eb; }         /* blue */
+.dark .dot.common { background: #64748b; }
+.dark .dot.shared-prog { background: #fb923c; } /* bright orange */
+.dark .dot.shared-ext { background: #2dd4bf; }  /* bright teal */
+.dark .dot.excl-prog { background: #f87171; }   /* bright red */
+.dark .dot.excl-ext { background: #60a5fa; }    /* bright blue */
 .unit-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   margin-right: 3px; vertical-align: middle; flex-shrink: 0; }
+.dark .unit-dot { filter: brightness(1.3); }
 
 .section-title { font-size: 1.5rem; font-weight: 700; margin-bottom: .5rem; }
 .section-subtitle { color: var(--text2); margin-bottom: 1.5rem; }
@@ -423,6 +460,48 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .lin-frame .lin-tag.uds { background: #ccfbf1; color: #0f766e; }
 .dark .lin-frame .lin-tag.uds { background: #042f2e; color: #5eead4; }
 
+/* LIN frame hex display */
+.lin-frame-row { display: flex; align-items: baseline; gap: 8px; margin: 2px 0; font-size: .73rem; }
+.lin-fr-type { font-family: var(--font-mono); font-weight: 700; color: var(--accent); min-width: 34px; }
+.lin-fr-hex { font-family: var(--font-mono); color: var(--text2); word-break: break-all; letter-spacing: .5px; }
+
+/* ===== Tip Box (light yellow insight/warning) ===== */
+.tip-box { background: #fef3c7; border-radius: 8px; padding: .8rem; margin-top: .8rem; font-size: .8rem; line-height: 1.5; color: #78350f; }
+.dark .tip-box { background: #422006; color: #fde68a; }
+
+/* ===== LIN Transport Protocol Tab ===== */
+.lin-section { margin-bottom: 2rem; }
+.lin-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin: .5rem 0 1rem; }
+.lin-table th, .lin-table td { padding: .5rem .7rem; text-align: left; border: 1px solid var(--border); }
+.lin-table th { background: var(--card2); font-weight: 600; font-size: .78rem; color: var(--text); }
+.lin-table td { color: var(--text); }
+.lin-table tr:nth-child(even) td { background: rgba(128,128,128,.04); }
+.lin-table code { background: var(--code-bg); padding: 1px 6px; border-radius: 3px; font-size: .82rem; color: var(--text); }
+
+.lin-frame-table { width: 100%; border-collapse: collapse; font-size: .78rem; margin: .5rem 0 1rem; }
+.lin-frame-table th, .lin-frame-table td { padding: .4rem .5rem; text-align: center; border: 1px solid var(--border); }
+.lin-frame-table th { background: var(--card2); font-weight: 600; color: var(--text); }
+.lin-frame-table .byte-nad { background: #dbeafe; color: #1e40af; font-weight: 600; }
+.lin-frame-table .byte-pci { background: #fef3c7; color: #92400e; font-weight: 600; }
+.lin-frame-table .byte-data { background: #d1fae5; color: #065f46; font-weight: 600; }
+.lin-frame-table .byte-fc { background: #fce7f3; color: #9d174d; font-weight: 600; }
+.lin-frame-table .byte-unused { background: var(--code-bg); color: var(--text3); }
+.lin-frame-table .byte-len { background: #e0e7ff; color: #4338ca; font-weight: 600; }
+.dark .lin-frame-table .byte-unused { background: #1e293b; color: #64748b; }
+.dark .lin-frame-table .byte-nad { background: #1e3a5f; color: #93c5fd; }
+.dark .lin-frame-table .byte-len { background: #1e3a5f; color: #a5b4fc; }
+.dark .lin-frame-table .byte-pci { background: #422006; color: #fbbf24; }
+.dark .lin-frame-table .byte-data { background: #064e3b; color: #6ee7b7; }
+.dark .lin-frame-table .byte-fc { background: #4c0519; color: #f9a8d4; }
+
+.lin-info-box { margin: .8rem 0; padding: .8rem 1rem; background: var(--code-bg); border-radius: 8px; border-left: 3px solid var(--primary); font-size: .82rem; line-height: 1.7; color: var(--text); }
+.lin-info-box code { background: var(--card2); padding: 1px 5px; border-radius: 3px; font-size: .8rem; }
+.lin-info-box strong { color: var(--primary); }
+
+.lin-legend { display: flex; gap: 1.2rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.lin-legend-item { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--text2); }
+.lin-legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
 /* ===== DTC Status Display ===== */
 .dtc-status-section { margin-top: .8rem; }
 .dtc-card { background: var(--card2); border-radius: 6px; padding: .6rem .7rem; margin-bottom: 6px; border-left: 3px solid var(--accent); }
@@ -533,8 +612,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <button class="nav-btn" data-tab="builder">🧱 消息构造器</button>
       <button class="nav-btn" data-tab="quiz">🧪 知识测验</button>
       <button class="nav-btn" data-tab="dtc">⚠️ DTC 状态字节</button>
-      <button class="nav-btn" data-tab="lin">🔌 LIN 传输协议</button>
-      <button class="nav-btn" data-tab="addressing">📍 寻址与响应</button>
+       <button class="nav-btn" data-tab="lin">🔌 LIN 传输协议</button>
+       <button class="nav-btn" data-tab="lin-uart">📡 LIN-UART</button>
+       <button class="nav-btn" data-tab="addressing">📍 寻址与响应</button>
     </nav>
   </aside>
   <main class="main-content">
@@ -565,10 +645,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <h2 class="section-title">🗺️ SID 服务地图</h2>
       <p class="section-subtitle">0x00 - 0xFF SID 空间总览。点击查看服务详情。</p>
       <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#dbeafe"></div> UDS 服务</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#fee2e2"></div> NRC 码</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#d1fae5"></div> 会话类型</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--code-bg)"></div> 保留/其他</div>
+        <div class="legend-item"><div class="legend-dot sid"></div> UDS 服务</div>
+        <div class="legend-item"><div class="legend-dot nrc"></div> NRC 码</div>
+        <div class="legend-item"><div class="legend-dot session"></div> 会话类型</div>
+        <div class="legend-item"><div class="legend-dot reserved"></div> 保留/其他</div>
       </div>
       <div class="search-box">
         <input type="text" id="hex-search" placeholder="搜索 SID 值 (如 22, 3E, 0x31)..." oninput="filterHexMap()">
@@ -717,11 +797,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           第二字节为 <strong>PCI (Protocol Control Information)</strong>，剩余 6 字节根据帧类型存放 UDS 数据或控制参数。
         </p>
         <div class="lin-legend">
-          <div class="lin-legend-item"><div class="lin-legend-dot" style="background:#dbeafe"></div> NAD (节点地址)</div>
-          <div class="lin-legend-item"><div class="lin-legend-dot" style="background:#fef3c7"></div> PCI (协议控制信息)</div>
-          <div class="lin-legend-item"><div class="lin-legend-dot" style="background:#d1fae5"></div> UDS 数据</div>
-          <div class="lin-legend-item"><div class="lin-legend-dot" style="background:#fce7f3"></div> 流控参数</div>
-          <div class="lin-legend-item"><div class="lin-legend-dot" style="background:var(--code-bg)"></div> 未使用/填充</div>
+        <div class="lin-legend-item"><div class="lin-legend-dot nad"></div> NAD (节点地址)</div>
+        <div class="lin-legend-item"><div class="lin-legend-dot pci"></div> PCI (协议控制信息)</div>
+        <div class="lin-legend-item"><div class="lin-legend-dot uds"></div> UDS 数据</div>
+        <div class="lin-legend-item"><div class="lin-legend-dot fc"></div> 流控参数</div>
+        <div class="lin-legend-item"><div class="lin-legend-dot unused"></div> 未使用/填充</div>
         </div>
 
         <!-- SF Frame -->
@@ -746,24 +826,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
         <!-- FF Frame -->
         <h4 style="margin:1.2rem 0 .5rem; font-size:.9rem; color:var(--primary)">🔹 First Frame (FF) — 多帧首帧</h4>
-        <p style="margin-bottom:.5rem; font-size:.82rem; color:var(--text2)">
-          UDS 数据 &gt; 6 字节时使用。PCI bits 7:5 = 1 (0x20), bits 4:0 = 总长度高 4 位。Byte 2 = 总长度低 8 位。后跟 4 字节 UDS 数据。
+        <p style="margin-bottom:.5rem; font-size:.82rem; color:var(--text2); line-height:1.7">
+          UDS 数据 <strong>&gt; 6 字节</strong> 时使用。PCI bits 7:5 = 1 (<code>0x20</code>)，bits 4:0 = 总长度 bit11:8（高 4 位）。<br/>
+          Byte 2 存放总长度 bit7:0（低 8 位），构成 <strong>12 位总长度</strong>，最大支持 <strong>4095 字节</strong>。<br/>
+          后 4 字节为 UDS 数据，最后一字节（Byte 7）为未使用填充。
         </p>
         <table class="lin-frame-table">
           <thead><tr><th>Byte 0</th><th>Byte 1</th><th>Byte 2</th><th>Byte 3</th><th>Byte 4</th><th>Byte 5</th><th>Byte 6</th><th>Byte 7</th></tr></thead>
           <tbody>
             <tr>
               <td class="byte-nad">NAD<br/><strong>0x01</strong></td>
-              <td class="byte-pci">PCI<br/><strong>0x20|len_hi</strong></td>
-              <td class="byte-data">len_lo</td>
-              <td class="byte-data" colspan="5">UDS 数据前 4 字节</td>
+              <td class="byte-pci">PCI<br/><strong>0x20</strong> | len_hi<br/><small>bits 7:5=001<br/>bits 4:0=len[11:8]</small></td>
+              <td class="byte-len">len_lo<br/><small>总长度 bit7:0<br/>(0x00–0xFF)</small></td>
+              <td class="byte-data" colspan="4">UDS 数据前 4 字节</td>
+              <td class="byte-unused">未使用<br/><small>填充</small></td>
             </tr>
           </tbody>
         </table>
         <div class="lin-info-box">
-          <strong>总长度编码:</strong> 12 位总长度 = (PCI &amp; 0x0F) &lt;&lt; 8 | Byte2<br/>
-          <strong>示例:</strong> 发送 20 字节消息 — PCI = 0x20 (len_hi=0), len_lo = 0x14 (20)<br/>
-          帧 = <code>01 20 14 XX XX XX XX FF</code>
+          <strong>📐 12 位总长度编码:</strong><br/>
+          总长度 = <code>(PCI &amp; 0x0F) &lt;&lt; 8 | len_lo</code>，范围 0–4095<br/><br/>
+          <strong>🔢 示例:</strong> 20 字节消息 — PCI bits 4:0 = 0 (len_hi=0), len_lo = <code>0x14</code> (20)<br/>
+          帧 = <code>01 20 14 ① ② ③ ④ FF</code><br/>
+          其中 ①②③④ 是 UDS 数据的前 4 个字节（如 <code>62 F1 90 4C</code>），<code>FF</code> 为填充<br/><br/>
+          <strong>📦 完整 4 帧示例（20 字节 = 4+6+6+4）:</strong>
+          <table style="width:100%;font-size:.75rem;margin-top:.3rem">
+            <tr><th style="text-align:left;padding:2px 6px">帧</th><th style="text-align:left;padding:2px 6px">PCI</th><th style="text-align:left;padding:2px 6px">完整 8 字节</th></tr>
+            <tr><td style="padding:2px 6px;font-family:monospace">FF</td><td style="padding:2px 6px;font-family:monospace">0x20</td><td style="padding:2px 6px;font-family:monospace">01 20 14 62 F1 90 4C FF</td></tr>
+            <tr><td style="padding:2px 6px;font-family:monospace">CF#1</td><td style="padding:2px 6px;font-family:monospace">0x41</td><td style="padding:2px 6px;font-family:monospace">01 41 53 56 41 42 34 42</td></tr>
+            <tr><td style="padding:2px 6px;font-family:monospace">CF#2</td><td style="padding:2px 6px;font-family:monospace">0x42</td><td style="padding:2px 6px;font-family:monospace">01 42 52 37 4E 31 32 33</td></tr>
+            <tr><td style="padding:2px 6px;font-family:monospace">CF#3</td><td style="padding:2px 6px;font-family:monospace">0x43</td><td style="padding:2px 6px;font-family:monospace">01 43 34 35 36 37 FF FF</td></tr>
+          </table>
         </div>
 
         <!-- CF Frame -->
@@ -977,6 +1070,185 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </div>
       </div>
     </div>
+    <div class="tab-content" id="tab-lin-uart">
+      <h2 class="section-title">📡 LIN 帧序与 UART 串口协议</h2>
+      <p class="section-subtitle">LIN 主从帧时序 — 从 Break 域到 Checksum，每个字节如何通过 UART 串口发送</p>
+
+      <!-- Section 1: Full LIN Frame -->
+      <div class="lin-section">
+        <h3>📐 1. 完整的 LIN 帧结构 (ISO 17987-3)</h3>
+        <p style="font-size:.9rem;color:var(--text2);line-height:1.7;margin-bottom:1rem">
+          LIN 总线上的一个完整帧由<strong>主节点发送帧头 (Header)</strong>，<strong>从节点回复响应 (Response)</strong>。
+          诊断帧使用固定的 ID：<code>0x3C</code>（主请求）和 <code>0x3D</code>（从响应）。
+        </p>
+        <table class="lin-table">
+          <thead>
+            <tr><th style="width:12%">域</th><th style="width:15%">长度</th><th>内容</th><th>发送方</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Break</strong></td><td>≥13 bit times 低电平</td>
+              <td>强制拉低总线——所有从节点识别为新帧开始</td>
+              <td style="color:#6366f1;font-weight:600">Master</td>
+            </tr>
+            <tr>
+              <td><strong>Sync</strong></td><td>1 字节 = 0x55</td>
+              <td>同步字节——从节点用它校准波特率</td>
+              <td style="color:#6366f1;font-weight:600">Master</td>
+            </tr>
+            <tr>
+              <td><strong>PID</strong></td><td>1 字节</td>
+              <td>Protected Identifier — 6位ID + 2位奇偶校验。诊断: <code>0x3C</code>(主请求) / <code>0x3D</code>(从响应)</td>
+              <td style="color:#6366f1;font-weight:600">Master</td>
+            </tr>
+            <tr style="border-bottom:2px solid var(--border)">
+              <td colspan="4" style="padding:.5rem;text-align:center;background:var(--card2);font-weight:600">
+                以上为 <span style="color:#6366f1">帧头 (Header)</span> —— 始终由 Master 发送
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Data</strong></td><td>0–8 字节</td>
+              <td>
+                数据场。诊断帧固定 8 字节<br/>
+                Master 发 PID=<code>0x3C</code> → <span style="color:#6366f1">Master</span> 接着发 UDS 请求数据<br/>
+                Master 发 PID=<code>0x3D</code> → <span style="color:#dc2626">Slave</span> 接着发 UDS 响应数据
+              </td>
+              <td><span style="color:#6366f1">Master</span> (请求)<br/><span style="color:#dc2626">Slave</span> (响应)</td>
+            </tr>
+            <tr>
+              <td><strong>Checksum</strong></td><td>1 字节</td>
+              <td>校验和——增强型 (PID+Data) 或经典型 (仅 Data)</td>
+              <td>同 Data 发送方</td>
+            </tr>
+            <tr>
+              <td colspan="4" style="background:var(--code-bg);padding:.8rem 1rem;font-size:.82rem;line-height:1.8">
+                <strong>🔑 PID 格式:</strong> 1 字节 = <strong>6 位 Frame ID</strong> (bit 0–5) + <strong>2 位奇偶校验</strong> (bit 6–7)<br/>
+                <code>bit 0–5</code> = Frame ID (0–63)，<code>bit 6</code> = P0 = ID0⊕ID1⊕ID2⊕ID4 (偶校验)<br/>
+                <code>bit 7</code> = P1 = ¬(ID1⊕ID3⊕ID4⊕ID5) (奇校验)<br/>
+                <strong>诊断帧 ID:</strong> <code>0x3C</code> (ID=60) 主请求帧, <code>0x3D</code> (ID=61) 从响应帧
+              </td>
+            </tr>
+            <tr>
+              <td colspan="4" style="background:var(--code-bg);padding:.8rem 1rem;font-size:.82rem;line-height:1.8">
+                <strong>✅ Checksum 格式:</strong><br/>
+                <strong>增强型 (Enhanced, LIN 2.x):</strong> Checksum = ¬( sum(PID + Data0 + ... + DataN) )，包含 PID<br/>
+                <strong>经典型 (Classic, LIN 1.x):</strong> Checksum = ¬( sum(Data0 + ... + DataN) )，仅数据字节<br/>
+                诊断帧 (ID 0x3C/0x3D) 使用 <strong>增强型</strong> 校验。加法带进位回卷 (carry-around)。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Section 2: UART Serial Byte -->
+      <div class="lin-section">
+        <h3>🔌 2. 每个字节如何通过 UART 发送</h3>
+        <p style="font-size:.9rem;color:var(--text2);line-height:1.7;margin-bottom:1rem">
+          数据场的每个字节不是"裸发"的——UART 串口会把每个 byte 包成 <strong>10 bit 的帧</strong>（Start + 8 data + Stop）。
+          LIN 物理层把 UART 的 TX 信号连到 LIN 收发器芯片，再由收发器驱动单线总线。
+        </p>
+        <div style="background:var(--code-bg);border-radius:8px;padding:1rem;font-family:var(--font-mono);font-size:.82rem;text-align:center;line-height:2;margin-bottom:1rem">
+          <span style="color:var(--success)">[Start=0]</span>
+          <span style="color:var(--text)">[D0]</span>
+          <span style="color:var(--text)">[D1]</span>
+          <span style="color:var(--text)">[D2]</span>
+          <span style="color:var(--text)">[D3]</span>
+          <span style="color:var(--text)">[D4]</span>
+          <span style="color:var(--text)">[D5]</span>
+          <span style="color:var(--text)">[D6]</span>
+          <span style="color:var(--text)">[D7]</span>
+          <span style="color:var(--danger)">[Stop=1]</span>
+          <br/>
+          <span style="font-size:.75rem;color:var(--text3)">← LSB first → 9600/19200 bps (LIN 典型)</span>
+        </div>
+        <div class="lin-info-box">
+          <strong>示例:</strong> 发送字节 <code>0x35</code> (二进制 <code>0011 0101</code>)<br/>
+          内存中 MSB→LSB: <code>0 0 1 1 0 1 0 1</code><br/>
+          线 上 LSB→MSB: <span style="color:var(--success)"><code>0</code></span>(Start) <span style="color:var(--primary)"><code>1 0 1 0 1 1 0 0</code></span> <span style="color:var(--danger)"><code>1</code></span>(Stop)<br/>
+          <span style="font-size:.8rem;color:var(--text2)">D0=1 最先, D7=0 最后 — 内存顺序恰好颠倒</span><br/>
+          在 LIN 19200 bps 下，1 字节 ≈ 0.52 ms
+        </div>
+      </div>
+
+      <!-- Section 3: Master/Slave Schedule -->
+      <div class="lin-section">
+        <h3>⏱️ 3. 主从帧调度时序</h3>
+        <p style="font-size:.9rem;color:var(--text2);line-height:1.7;margin-bottom:1rem">
+          LIN 是<strong>主从架构</strong>——所有通信由 Master 发起。从节点只有在收到匹配 PID 后才回复。
+        </p>
+        <div style="background:var(--card2);border-radius:8px;padding:1rem;font-size:.82rem;line-height:1.8">
+          <strong style="color:var(--text)">📤 诊断请求帧 (PID=0x3C)</strong><br/>
+          <span style="color:var(--text2)">Master 发送全部 — Header 和 8 字节诊断请求都在同一帧内</span>
+          <table class="lin-frame-table" style="margin:.4rem 0 1rem">
+            <tr>
+              <td class="byte-nad" style="font-size:.72rem">Break</td>
+              <td class="byte-nad" style="font-size:.72rem">Sync</td>
+              <td class="byte-nad" style="font-size:.72rem">PID 0x3C</td>
+              <td class="byte-nad" style="font-size:.72rem">NAD</td>
+              <td class="byte-nad" style="font-size:.72rem">PCI</td>
+              <td class="byte-nad" style="font-size:.72rem;line-height:1.4" colspan="3">UDS 请求 (6B)</td>
+              <td class="byte-nad" style="font-size:.72rem">Chk</td>
+            </tr>
+          </table>
+
+          <strong style="color:var(--text)">📥 诊断响应帧 (PID=0x3D)</strong><br/>
+          <span style="color:var(--text2)">Master 发 Header，Slave 接着填 8 字节诊断响应数据</span>
+          <table class="lin-frame-table" style="margin:.4rem 0 0">
+            <tr>
+              <td class="byte-nad" style="font-size:.72rem">Break</td>
+              <td class="byte-nad" style="font-size:.72rem">Sync</td>
+              <td class="byte-nad" style="font-size:.72rem">PID 0x3D</td>
+              <td class="byte-pci" style="font-size:.72rem">NAD</td>
+              <td class="byte-pci" style="font-size:.72rem">PCI</td>
+              <td class="byte-pci" style="font-size:.72rem;line-height:1.4" colspan="3">UDS 响应 (6B)</td>
+              <td class="byte-pci" style="font-size:.72rem">Chk</td>
+            </tr>
+          </table>
+          <div style="margin-top:.5rem;font-size:.75rem;color:var(--text3)">
+            <span style="background:#dbeafe;padding:2px 8px;border-radius:3px">蓝 = Master 发送</span>
+            <span style="background:#fef3c7;padding:2px 8px;border-radius:3px;margin-left:6px">黄 = Slave 回复</span>
+            <span style="margin-left:6px">两帧间隔由 Master 调度表控制 (Slave P2 处理时间)</span>
+          </div>
+        </div>
+        <div class="lin-info-box">
+          <strong>🔢 诊断帧 Header 之后:</strong><br/>
+          如果 PID = <code>0x3C</code> (主请求帧): <strong>Master</strong> 接着发 8 字节诊断请求<br/>
+          如果 PID = <code>0x3D</code> (从响应帧): <strong>指定 NAD 的 Slave</strong> 接着发 8 字节诊断响应<br/><br/>
+          <strong>⚠️ 关键:</strong> 诊断请求和响应使用不同的帧——主请求 (0x3C) 之后下一帧是从响应 (0x3D)。
+          Master 在调度表里安排这两个帧的间隔，给 Slave 留出处理时间 (P2)。
+        </div>
+      </div>
+
+      <!-- Section 4: Full Stack -->
+      <div class="lin-section">
+        <h3>🏗️ 4. 从 UART 字节到 LIN 帧的完整层级</h3>
+        <table class="lin-table">
+          <thead><tr><th>层级</th><th>数据单元</th><th>关系</th><th>标准</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>UDS 应用层</td><td>Service Request/Response (SID + params)</td>
+              <td>被 LIN 传输层分帧承载</td><td>ISO 14229-1</td>
+            </tr>
+            <tr>
+              <td>LIN 传输层</td><td>N_PCI (SF/FF/CF/FC) + NAD + UDS</td>
+              <td>填入数据场的 8 字节</td><td>ISO 17987-2</td>
+            </tr>
+            <tr>
+              <td>LIN 数据链路层</td><td>完整帧 = Header + Data + Checksum</td>
+              <td>Data 每个字节被 UART 分 bit 发送</td><td>ISO 17987-3</td>
+            </tr>
+            <tr>
+              <td>UART 串口</td><td>10 bit/byte (Start+8D+Stop)</td>
+              <td>把每个字节变成串行信号</td><td>— (硬件)</td>
+            </tr>
+            <tr>
+              <td>LIN 物理层</td><td>12V 单线差分信号</td>
+              <td>收发器芯片做电平转换</td><td>ISO 17987-4</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
     <div class="tab-content" id="tab-dtc">
       <h2 class="section-title">⚠️ DTC 状态字节</h2>
       <p class="section-subtitle">ISO 14229-1:2020 Annex D — 8 位 DTC 状态字节的交互式位可视化</p>
@@ -1103,7 +1375,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
               <div><span style="color:#7c3aed">#endif</span></div>
               <div style="margin-top:.5rem;font-size:.78rem;color:var(--text2)">默认值 0 = 处理前立即发送 RCRRP。<br>设置为非零值 &gt; 0 表示延迟 N ms 后如未完成则发送。</div>
             </div>
-            <div style="background:#fef3c7;border-radius:8px;padding:.8rem;margin-top:.8rem;font-size:.8rem;line-height:1.5">
+            <div class="tip-box">
               <strong>💡 典型用法：</strong><code>-DUDS_RCRRP_DELAY_MS=50</code> — 处理时间超过 50ms 后自动发送 0x78，让客户端知道 "正在处理"。
             </div>
           </div>
@@ -1151,7 +1423,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
                 <tr><td style="padding:.3rem .6rem;font-family:monospace">3E <span style="color:var(--danger)">80</span></td><td style="padding:.3rem .6rem;font-family:monospace">1</td><td style="padding:.3rem .6rem;font-family:monospace">0x00</td><td style="padding:.3rem .6rem">🚫 抑制正响应</td></tr>
               </tbody>
             </table>
-            <div style="background:#fef3c7;border-radius:8px;padding:.8rem;margin-top:.8rem;font-size:.8rem;line-height:1.5">
+            <div class="tip-box">
               <strong>💡 关键：</strong>bit7=1 时的子功能值为 <code>sf & 0x7F</code>（去除 bit7），即 <code>0x80 → 0x00</code>，两个请求调用的服务处理函数完全相同。
             </div>
           </div>
@@ -1220,7 +1492,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           </div>
         </div>
 
-        <div style="background:#fef3c7;border-radius:8px;padding:.8rem;margin-top:.8rem;font-size:.8rem;line-height:1.5">
+        <div class="tip-box">
           <strong>⚠️ 注意：</strong>请求 SID 范围限制在 0x10-0x3E 和 0x84-0x87（见 <code>IS_REQUEST_SID()</code> 宏）。对应的正响应 SID 为 0x50-0x7E 和 0xC4-0xC7。
           任何消息的第一个字节如果不是 0x7F（负响应）且减去 0x40 后落在请求 SID 范围内，即为正响应消息。
         </div>
@@ -1597,7 +1869,6 @@ function showServiceDetail(sid) {
 // Init
 loadTheme();
 switchMode('learn');
-renderHexMap();
 </script>
 </body>
 <script>
@@ -2423,7 +2694,7 @@ function updateBuilder() {
 
   document.getElementById('builder-response').innerHTML =
     `正响应: ${resBytes.map(b => `<span class="byte sid-byte">${b.toString(16).toUpperCase().padStart(2,'0')}</span>`).join(' ')}<br>` +
-    `负响应: <span class="byte" style="border-color:var(--danger);background:#fee2e2">7F</span> <span class="byte" style="border-color:var(--danger);background:#fee2e2">${s.reqSID}</span> <span class="byte" style="border-color:var(--danger);background:#fee2e2">NRC</span>`;
+    `负响应: <span class="byte nrc">7F</span> <span class="byte nrc">${s.reqSID}</span> <span class="byte nrc">NRC</span>`;
 }
 
 // Init service browser and builder on page load
@@ -2543,10 +2814,11 @@ function renderSessions() {
 
   // ── Exclusivity legend ──
   html += '<div class="legend-row">'
-    + '<span><span class="dot" style="background:#94a3b8"></span> 通用</span>'
-    + '<span><span class="dot" style="background:#f59e0b"></span> 共享</span>'
-    + '<span><span class="dot" style="background:#dc2626"></span> 🔒 编程专属</span>'
-    + '<span><span class="dot" style="background:#2563eb"></span> 🔒 扩展专属</span>'
+    + '<span><span class="dot common"></span> 所有会话通用</span>'
+    + '<span><span class="dot shared-prog"></span> 与编程共享</span>'
+    + '<span><span class="dot shared-ext"></span> 与扩展共享</span>'
+    + '<span><span class="dot excl-prog"></span> 🔒 编程专属</span>'
+    + '<span><span class="dot excl-ext"></span> 🔒 扩展专属</span>'
     + '</div>';
 
   // ── Functional unit legend ──
@@ -3225,20 +3497,49 @@ function decodePCI(pciByte) {
 }
 
 /**
- * Generate LIN frame annotation string from raw UDS bytes.
- * Assumes NAD=0x01, PCI=SF with length equal to byte count.
+ * Generate LIN frame annotation from raw UDS bytes.
+ * Shows the complete 8-byte LIN frame hex for each diagnostic frame.
+ * Assumes NAD=0x01. Uses SF (single frame), FF (first frame), CF (consecutive frame)
+ * per ISO 15765-2 / LIN Transport Protocol.
  */
 function linFrameAnnotation(bytes) {
-  if (!Array.isArray(bytes) || bytes.length === 0) return null;
+  if (!Array.isArray(bytes) || bytes.length === 0) return '';
   var udsLen = bytes.length;
-  var pci = 0x00 | (udsLen & 0x0F);
-  var pciInfo = (udsLen > 15) ? { typeName: 'FF', len: udsLen } : { typeName: 'SF', len: udsLen };
-  var udsHex = bytes.map(function(b) {
-    return typeof b === 'number' ? b.toString(16).toUpperCase().padStart(2,'0') : b;
-  }).join(' ');
-  return '<span class="lin-tag nad">NAD:01</span>'
-    + '<span class="lin-tag pci">PCI:' + pciInfo.typeName + ' len=' + pciInfo.len + '</span>'
-    + '<span class="lin-tag uds">UDS:' + udsHex + '</span>';
+  var frames = [];
+  var b2hex = function(b) { return (typeof b === 'number' ? b : parseInt(b, 16)).toString(16).toUpperCase().padStart(2,'0'); };
+  var pad8 = function(arr) { while (arr.length < 8) arr.push(0xFF); return arr; };
+
+  if (udsLen <= 6) {
+    // Single Frame: NAD=0x01, PCI=SF(type=0) | len
+    var sf = [0x01, (udsLen & 0x0F)];
+    for (var i = 0; i < udsLen; i++) sf.push(bytes[i]);
+    frames.push({ type: 'SF', hex: pad8(sf).map(b2hex).join(' ') });
+  } else {
+    // First Frame: NAD, PCI=0x20|len_hi, len_lo, first 4 UDS bytes
+    var lenHi = (udsLen >> 8) & 0x0F, lenLo = udsLen & 0xFF;
+    var ff = [0x01, 0x20 | lenHi, lenLo];
+    for (var i = 0; i < 4 && i < udsLen; i++) ff.push(bytes[i]);
+    frames.push({ type: 'FF', hex: pad8(ff).map(b2hex).join(' ') });
+
+    // Consecutive Frames: NAD, PCI=0x40|seq, 6 UDS bytes each
+    var seq = 1, off = 4;
+    while (off < udsLen) {
+      var cf = [0x01, 0x40 | (seq & 0x0F)];
+      for (var i = 0; i < 6 && off + i < udsLen; i++) cf.push(bytes[off + i]);
+      frames.push({ type: 'CF#' + seq, hex: pad8(cf).map(b2hex).join(' ') });
+      off += 6;
+      seq = (seq % 15) + 1;
+    }
+  }
+
+  var html = '';
+  for (var f = 0; f < frames.length; f++) {
+    html += '<div class="lin-frame-row">'
+      + '<span class="lin-fr-type">' + frames[f].type + '</span>'
+      + '<code class="lin-fr-hex">' + frames[f].hex + '</code>'
+      + '</div>';
+  }
+  return html;
 }
 
 // ── Message Log ────────────────────────────────────────────────────────
@@ -3268,7 +3569,7 @@ function addLogEntry(bytes, desc, type, reqBytes) {
   var linAnnot = '';
   if (Array.isArray(bytes) && bytes.length > 0) {
     var ann = linFrameAnnotation(bytes);
-    if (ann) linAnnot = '<div class="lin-frame">🔗 LIN: ' + ann + '</div>';
+    if (ann) linAnnot = '<div class="lin-frame">' + ann + '</div>';
   }
 
   // NRC detail link for negative responses (0x7F + SID + NRC)
@@ -4051,5 +4352,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initComposer();
   }
 });
+
+// Hex map render (must run after UDSLearn data definitions above)
+renderHexMap();
 </script>
 </html>
