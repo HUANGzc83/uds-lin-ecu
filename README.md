@@ -220,7 +220,7 @@ cmake --build build
 ### 测试套件一览 | Test Suite Overview
 
 | 测试可执行文件 | Test Executable | 覆盖范围 | Coverage |
-|------|------|------|
+|------|------|------|------|
 | `uds-core-test` | 解析器/序列化器 | Parser / Serializer |
 | `uds-session-test` | 会话状态机 | Session State Machine |
 | `uds-lin-transport-test` | LIN 传输层 (N_PCI) | LIN Transport Layer (N_PCI) |
@@ -326,18 +326,18 @@ cmake --build build
 
 Authoritative standards the implementation is based on.
 
-| 标准 | Standard | 年份 | Year | 内容 | Content |
-|------|----------|------|------|------|
-| ISO 14229-1:2020 | | 2020 | UDS 应用层 — 所有 26 个服务的语义定义 | UDS Application Layer — semantic definition of all 26 services |
-| ISO 14229-2:2013 | | 2013 | UDS 会话层 — 计时参数 (P2, P2\*, S3 等) | UDS Session Layer — timing parameters (P2, P2\*, S3, etc.) |
-| ISO 14229-3:2012 | | 2012 | UDS on CAN — CAN 总线特定适配 | UDS on CAN — CAN bus adaptation |
-| ISO 14229-4:2012 | | 2012 | UDS on FlexRay | UDS on FlexRay |
-| ISO 14229-5:2013 | | 2013 | UDS on IP (DoIP) | UDS on IP (DoIP) |
-| ISO 14229-6:2013 | | 2013 | UDS on K-Line | UDS on K-Line |
-| **ISO 14229-7:2015** | | **2015** | **UDS on LIN — LIN 总线适配层** | **UDS on LIN — LIN bus adaptation layer** |
-| ISO 14229-8:2020 | | 2020 | UDS on Clock Extension | UDS on Clock Extension |
-| ISO 17987-2 | | — | LIN 传输层 & 网络层 (N_PCI: SF/FF/CF/FC 帧格式) | LIN Transport & Network Layer (N_PCI: SF/FF/CF/FC frame formats) |
-| ISO 17987-3 | | — | LIN 数据链路层与协议规范 | LIN Data Link Layer & Protocol Specification |
+| 标准 | 年份 | 内容 (中文) | Content (English) |
+|------|------|------------|-------------------|
+| ISO 14229-1:2020 | 2020 | UDS 应用层 — 所有 26 个服务定义 | UDS Application Layer — all 26 services |
+| ISO 14229-2:2013 | 2013 | UDS 会话层 — P2/P2\*/S3 时序 | UDS Session Layer — P2/P2\*/S3 timing |
+| ISO 14229-3:2012 | 2012 | UDS on CAN | UDS on CAN |
+| ISO 14229-4:2012 | 2012 | UDS on FlexRay | UDS on FlexRay |
+| ISO 14229-5:2013 | 2013 | UDS on IP (DoIP) | UDS on IP (DoIP) |
+| ISO 14229-6:2013 | 2013 | UDS on K-Line | UDS on K-Line |
+| **ISO 14229-7:2015** | **2015** | **UDS on LIN** | **UDS on LIN** |
+| ISO 14229-8:2020 | 2020 | UDS on Clock Extension | UDS on Clock Extension |
+| ISO 17987-2 | — | LIN 传输层 (N_PCI: SF/FF/CF/FC) | LIN Transport Layer (N_PCI) |
+| ISO 17987-3 | — | LIN 数据链路层 | LIN Data Link Layer |
 
 > 注意：TXT 文件为 PDF 文本提取产物，表格、图表和部分数值可能不完整。精确协议验证请查阅原始 PDF。
 > Note: TXT files are PDF text extractions; tables, figures, and some numeric values may be incomplete. For precise protocol verification, consult original PDF documents.
