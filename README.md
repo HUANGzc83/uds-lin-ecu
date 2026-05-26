@@ -3,6 +3,8 @@
 [![ISO 14229-1](https://img.shields.io/badge/ISO--14229--1:2020-blue)](doc/)
 [![Language](https://img.shields.io/badge/C-C11-green)]()
 
+> ⚠️ **AI Coding 声明 | AI-Generated Notice**：本项目由 AI 辅助生成，仅供参考学习 UDS 诊断协议 (ISO 14229-1) 和 LIN 总线通信。不适用于生产环境。This project is AI-assisted and intended for educational reference only — for learning UDS diagnostic protocol (ISO 14229-1) and LIN bus communication. Not for production use.
+
 C11 实现的 ISO 14229-1 统一诊断服务，运行在 LIN 总线上的 ECU。
 A C11 implementation of ISO 14229-1 Unified Diagnostic Services (UDS) for an ECU communicating over LIN.
 
