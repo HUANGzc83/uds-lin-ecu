@@ -72,11 +72,7 @@ extern "C" {
 /**
  * @brief Service handler function signature.
  *
- * Matches the existing pattern used by all UDS service handlers in the
- * codebase (uds_svc_diagcomm, uds_svc_data, etc.).
- *
- * The @p context parameter is @c void* for backward compatibility.
- * Handlers should use the typed accessor macros from @ref uds_context_t:
+ * Handlers use the typed accessor macros from uds_core.h:
  * @code
  *   uds_session_context_t *sctx = UDS_CTX_SESSION(context);
  *   bool unlocked = *UDS_CTX_UNLOCKED(context);
@@ -84,7 +80,7 @@ extern "C" {
  *
  * @param[in]     req      Parsed UDS request
  * @param[out]    rsp      Response structure (positive or negative)
- * @param[in,out] context  Opaque context (cast to @ref uds_context_t for typed access)
+ * @param[in,out] context  Opaque context, cast via UDS_CTX_SESSION / UDS_CTX_UNLOCKED
  * @return true to send the response, false to suppress (SPRMIB)
  */
 typedef bool (*uds_service_handler_t)(const uds_request_t *req,

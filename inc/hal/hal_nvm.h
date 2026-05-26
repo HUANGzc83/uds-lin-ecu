@@ -25,6 +25,8 @@ extern "C" {
  * @return HAL_OK           Read completed
  * @return HAL_ERROR        Read failed (e.g. invalid address range)
  */
+hal_status_t hal_nvm_init(void);
+
 hal_status_t hal_nvm_read(uint32_t address, uint8_t *data, uint16_t len);
 
 /**

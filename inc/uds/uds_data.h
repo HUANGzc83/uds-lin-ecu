@@ -51,7 +51,7 @@ typedef struct {
     uds_did_access_t access;                    /**< @brief Access control type */
 
     /** @brief Pointer to data buffer (used when on_read/on_write is NULL) */
-    uint8_t *data;
+    const uint8_t *data;
 
     /**
      * @brief Optional read callback (invoked instead of copying from data ptr).

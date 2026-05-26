@@ -38,16 +38,14 @@ macro(add_uds_warnings TARGET)
         -Werror
         -Wextra
         -Wshadow
-        -Wconversion
         -Wpedantic
         -Wstrict-prototypes
-        -Wmissing-prototypes
         -Wformat=2
         -Wno-unused-parameter
-        -Wno-missing-prototypes
-        -Wno-sign-compare
-        -Wno-conversion
-        -Wno-type-limits
+        -Wno-sign-compare   # TODO: fix sign-compare warnings
+        -Wno-type-limits    # TODO: fix type-limits warnings
+        -Wundef
+        -Wswitch-default
     )
 endmacro()
 
@@ -276,6 +274,13 @@ add_uds_test(integration test/test_uds_integration.c test/mock/mock_uart.c test/
 # Service Dispatch Tests (Wave 3d Task 18)
 # ============================================================
 add_uds_test(service test/test_svc_service.c test/mock/mock_timer.c)
+
+# ============================================================
+# Shared Response Helper Tests (Wave 1 Task 8)
+# ============================================================
+# RED stage: functions declared but not yet implemented →
+# expected link failure with undefined references.
+add_uds_test(svc-util test/test_svc_util.c)
 
 # ============================================================
 # Fuzz Targets (optional, enabled with -DENABLE_FUZZ=ON)

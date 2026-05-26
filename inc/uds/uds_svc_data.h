@@ -23,6 +23,7 @@
 #pragma once
 
 #include "uds/uds_core.h"
+#include "uds/uds_cfg.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -52,11 +53,6 @@ extern "C" {
 /** @brief Size of the simulated memory buffer for 0x23/0x3D */
 #ifndef MEMORY_BUF_SIZE
 #define MEMORY_BUF_SIZE 1024
-#endif
-
-/** @brief Maximum number of registrable memory regions for 0x23/0x3D */
-#ifndef UDS_MEM_REGION_MAX
-#define UDS_MEM_REGION_MAX 8
 #endif
 
 /* ======================================================================== *

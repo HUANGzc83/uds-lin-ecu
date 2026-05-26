@@ -28,6 +28,7 @@
 #pragma once
 
 #include "uds/uds_core.h"
+#include "uds/uds_cfg.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -42,11 +43,6 @@ extern "C" {
 /** @brief Size of the transfer data buffer (default 1024 bytes) */
 #ifndef UDS_TRANSFER_BUFFER_SIZE
 #define UDS_TRANSFER_BUFFER_SIZE  1024u
-#endif
-
-/** @brief Maximum number of configurable memory regions for upload/download */
-#ifndef UDS_MEM_REGION_MAX
-#define UDS_MEM_REGION_MAX  4u
 #endif
 
 /** @brief Default max block length returned by RequestDownload/RequestUpload */

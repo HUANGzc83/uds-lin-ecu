@@ -5,6 +5,12 @@ build/
 *.exe
 *.out
 
+# ISO Standard Reference (copyrighted)
+ISO 14229-1-2020.txt
+
+# Temp compile artifacts
+test_compile/
+
 # IDE
 .idea/
 .vscode/
@@ -14,6 +20,7 @@ build/
 
 # CMake
 CMakeCache.txt
+CMakeUserPresets.json
 CMakeFiles/
 cmake_install.cmake
 CTestTestfile.cmake

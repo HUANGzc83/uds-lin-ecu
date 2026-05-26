@@ -77,7 +77,7 @@ void uds_did_init(void)
     did_registry[did_count].did       = 0xF190;
     did_registry[did_count].len       = 17;
     did_registry[did_count].access    = DID_READ_ONLY;
-    did_registry[did_count].data      = (uint8_t*)default_vin;
+    did_registry[did_count].data      = default_vin;
     did_registry[did_count].on_read   = NULL;
     did_registry[did_count].on_write  = NULL;
     did_count++;
@@ -86,7 +86,7 @@ void uds_did_init(void)
     did_registry[did_count].did       = 0xF186;
     did_registry[did_count].len       = 10;
     did_registry[did_count].access    = DID_READ_ONLY;
-    did_registry[did_count].data      = (uint8_t*)default_ecu_sn;
+    did_registry[did_count].data      = default_ecu_sn;
     did_registry[did_count].on_read   = NULL;
     did_registry[did_count].on_write  = NULL;
     did_count++;
@@ -95,7 +95,7 @@ void uds_did_init(void)
     did_registry[did_count].did       = 0xF187;
     did_registry[did_count].len       = 8;
     did_registry[did_count].access    = DID_READ_ONLY;
-    did_registry[did_count].data      = (uint8_t*)default_sw_num;
+    did_registry[did_count].data      = default_sw_num;
     did_registry[did_count].on_read   = NULL;
     did_registry[did_count].on_write  = NULL;
     did_count++;
@@ -104,7 +104,7 @@ void uds_did_init(void)
     did_registry[did_count].did       = 0xF18C;
     did_registry[did_count].len       = 8;
     did_registry[did_count].access    = DID_READ_ONLY;
-    did_registry[did_count].data      = (uint8_t*)default_sw_ver;
+    did_registry[did_count].data      = default_sw_ver;
     did_registry[did_count].on_read   = NULL;
     did_registry[did_count].on_write  = NULL;
     did_count++;
@@ -255,7 +255,7 @@ bool uds_did_write(uint16_t did, const uint8_t *data, uint16_t len, bool unlocke
         return entry->on_write(entry->did, data, len);
     }
 
-    (void)memcpy(entry->data, data, len);
+    (void)memcpy((uint8_t *)entry->data, data, len);
     return true;
 }
 
