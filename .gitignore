@@ -45,6 +45,9 @@ build-release/
 .omo/notepads/
 .omo/run-continuation/
 
+# Sisyphus legacy directory
+.sisyphus/
+
 # Temp
 *.log
 *.tmp
