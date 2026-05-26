@@ -1153,14 +1153,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <table class="lin-frame-table" style="margin:.4rem 0 0">
             <tr>
               <td class="byte-nad" style="font-size:.72rem">Start<br/>0</td>
-              <td class="byte-data" style="font-size:.72rem">D0</td>
-              <td class="byte-data" style="font-size:.72rem">D1</td>
-              <td class="byte-data" style="font-size:.72rem">D2</td>
-              <td class="byte-data" style="font-size:.72rem">D3</td>
-              <td class="byte-data" style="font-size:.72rem">D4</td>
-              <td class="byte-data" style="font-size:.72rem">D5</td>
-              <td class="byte-data" style="font-size:.72rem">D6</td>
-              <td class="byte-data" style="font-size:.72rem">D7</td>
+              <td class="byte-data" style="font-size:.72rem">BIT0</td>
+              <td class="byte-data" style="font-size:.72rem">BIT1</td>
+              <td class="byte-data" style="font-size:.72rem">BIT2</td>
+              <td class="byte-data" style="font-size:.72rem">BIT3</td>
+              <td class="byte-data" style="font-size:.72rem">BIT4</td>
+              <td class="byte-data" style="font-size:.72rem">BIT5</td>
+              <td class="byte-data" style="font-size:.72rem">BIT6</td>
+              <td class="byte-data" style="font-size:.72rem">BIT7</td>
               <td class="byte-pci" style="font-size:.72rem">Stop<br/>1</td>
             </tr>
           </table>
@@ -1174,7 +1174,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <strong>示例:</strong> 发送字节 <code>0x35</code> (二进制 <code>0011 0101</code>)<br/>
           内存中 MSB→LSB: <code>0 0 1 1 0 1 0 1</code><br/>
           线 上 LSB→MSB: <span style="color:var(--success)"><code>0</code></span>(Start) <span style="color:var(--primary)"><code>1 0 1 0 1 1 0 0</code></span> <span style="color:var(--danger)"><code>1</code></span>(Stop)<br/>
-          <span style="font-size:.8rem;color:var(--text2)">D0=1 最先, D7=0 最后 — 内存顺序恰好颠倒</span><br/>
+          <span style="font-size:.8rem;color:var(--text2)">BIT0=1 最先, BIT7=0 最后 — 内存顺序恰好颠倒</span><br/>
           在 LIN 19200 bps 下，1 字节 ≈ 0.52 ms
         </div>
       </div>
