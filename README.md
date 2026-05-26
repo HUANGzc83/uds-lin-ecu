@@ -1,6 +1,6 @@
 # UDS over LIN — ECU 诊断协议栈 | Diagnostic Stack
 
-[![ISO 14229-1](https://img.shields.io/badge/ISO-14229--1-2020-blue)](doc/)
+[![ISO 14229-1](https://img.shields.io/badge/ISO--14229--1:2020-blue)](doc/)
 [![Language](https://img.shields.io/badge/C-C11-green)]()
 
 C11 实现的 ISO 14229-1 统一诊断服务，运行在 LIN 总线上的 ECU。
