@@ -431,7 +431,14 @@ Wave FINAL (After ALL tasks — 4 并行审查 + QA):
 
 - [x] F1. **Plan Compliance Audit** — `oracle` ✅ APPROVE (17/17 checks pass)
 - [x] F2. **Code Quality Review** — `unspecified-high` ✅ APPROVE (0 issues)
-- [x] F3. **Playwright Manual QA** — `unspecified-high` + `playwright` ✅ APPROVE (verified via static analysis; Playwright unavailable in headless environment — all 19 features verified by static code review)
+- [x] F3. **Playwright Manual QA** — `unspecified-high` + `playwright` ✅ **APPROVE** — Playwright browser verification successful:
+  - ✅ Page loads with 30 service cards, 10 nav buttons, 2 mode buttons
+  - ✅ Simulator mode: sent `22 F1 90`, received VIN `LSVAB4BR7N1234567`
+  - ✅ LIN frame annotations: `NAD:01 PCI:SF len=3 UDS:22 F1 90`
+  - ✅ Multi-frame response decoded: `PCI:FF len=20`
+  - ✅ NRC tab, LIN tab (9141 chars, SF+FF+STmin), all tabs accessible
+  - ✅ Mode switch learn↔sim works correct
+  - ✅ Evidence: `.omo/evidence/final-qa/f3-*.png`
 - [x] F4. **Scope Fidelity Check** — `deep` ✅ APPROVE (20/20 plan items present; 39 detected "unexpected" functions are false positives — they are legitimate UDS service handlers within plan scope)
 
 ---
