@@ -49,6 +49,9 @@ build-release/
 *.log
 *.tmp
 
+# Doc — PDFs too large for git
+doc/*.pdf
+
 # Windows
 Thumbs.db
 Desktop.ini
