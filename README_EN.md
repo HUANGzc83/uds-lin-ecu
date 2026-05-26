@@ -25,47 +25,15 @@ A complete diagnostic stack built for learning: from physical UART frames up thr
 
 ## Architecture
 
-The complete data flow for diagnostic requests and responses. Left side is request (downstream), right side is response (upstream).
+Bidirectional data flow for diagnostic requests (downstream) and responses (upstream).
 
-```
-  LIN Bus
-    │
-  HAL UART (uart_read / uart_write)
-    │        Implementation: src/hal/hal_stubs.c (embedded stubs) or hal_uart_posix.c (desktop sim)
-    │
-  LIN Transport Layer (N_PCI)
-    │        ISO 17987-2: single-frame / first-frame / consecutive-frame / flow-control segmentation
-    │        src/uds/uds_lin_transport.c
-    │
-  UDS Parser
-    │        Extracts SID, sub-function, parameters; validates minimum length; detects suppress positive response bit
-    │        src/uds/uds_core.c — uds_parse_request()
-    │
-  Session Management
-    │        Default / Programming / Extended session state machine, P2 timing
-    │        src/uds/uds_session.c
-    │
-  Security Access
-    │        Seed-key challenge/response state machine (Level 1 / Level 2)
-    │        src/uds/uds_security.c
-    │
-  Service Dispatch
-    │        SID → handler routing table, 27-byte service list
-    │        src/uds/uds_service.c
-    │
-  Service Handlers (26 standard UDS services)
-    │        Grouped by functional module (see table below)
-    │
-  UDS Serializer
-    │        Positive response (SID+0x40) or negative response (0x7F + NRC) formatting
-    │        src/uds/uds_core.c — uds_serialize_response()
-    │
-  LIN Transport Layer (transmit direction)
-    │        Frame segmentation
-    │
-  HAL UART (uart_write)
-    │
-  LIN Bus
+```mermaid
+flowchart LR
+    REQ["📥 Request\nLIN Bus → HAL UART\n→ LIN Transport (N_PCI reassembly)\n→ UDS Parser"]
+    REQ --> PROC
+    PROC["⚙️ Processing\nSession → Security Access\n→ Dispatch → 26 Service Handlers"]
+    PROC --> RSP
+    RSP["📤 Response\nUDS Serializer\n→ LIN Transport (N_PCI segment)\n→ HAL UART → LIN Bus"]
 ```
 
 ### Key Design Decisions

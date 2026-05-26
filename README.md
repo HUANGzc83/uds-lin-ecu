@@ -25,47 +25,15 @@ C11 实现的 ISO 14229-1 统一诊断服务，运行在 LIN 总线上的 ECU。
 
 ## 架构
 
-诊断请求与响应的完整数据流路径。左侧为请求（下行），右侧为响应（上行）。
+诊断请求（下行）与响应（上行）的双向数据流。
 
-```
-  LIN 总线
-    │
-  HAL UART (uart_read / uart_write)
-    │        实现：src/hal/hal_stubs.c（嵌入式占位）或 hal_uart_posix.c（桌面模拟）
-    │
-  LIN 传输层 (N_PCI)
-    │        ISO 17987-2: SF / FF / CF / FC 帧拆分与重组
-    │        src/uds/uds_lin_transport.c
-    │
-  UDS 解析器
-    │        提取 SID、子功能、参数；验证最小长度；检测抑制正响应位
-    │        src/uds/uds_core.c — uds_parse_request()
-    │
-  会话管理
-    │        Default / Programming / Extended 会话状态机，P2 timing
-    │        src/uds/uds_session.c
-    │
-  安全访问
-    │        种子-密钥挑战与验证状态机（Level 1 / Level 2）
-    │        src/uds/uds_security.c
-    │
-  服务分发
-    │        SID → 处理器路由表, 27-byte 服务列表
-    │        src/uds/uds_service.c
-    │
-  服务处理器（26 个标准 UDS 服务）
-    │        按功能模块分组（见下方表格）
-    │
-  UDS 序列化器
-    │        正响应 (SID+0x40) 或负响应 (0x7F + NRC) 格式化
-    │        src/uds/uds_core.c — uds_serialize_response()
-    │
-  LIN 传输层（出方向）
-    │        帧拆分
-    │
-  HAL UART (uart_write)
-    │
-  LIN 总线
+```mermaid
+flowchart LR
+    REQ["📥 请求\nLIN 总线 → HAL UART\n→ LIN 传输层 (N_PCI 重组)\n→ UDS 解析器"]
+    REQ --> PROC
+    PROC["⚙️ 服务处理\n会话管理 → 安全访问\n→ 服务分发 → 26 个服务处理器"]
+    PROC --> RSP
+    RSP["📤 响应\nUDS 序列化器\n→ LIN 传输层 (N_PCI 拆分)\n→ HAL UART → LIN 总线"]
 ```
 
 ### 关键设计决策
