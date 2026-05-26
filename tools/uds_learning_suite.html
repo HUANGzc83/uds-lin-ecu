@@ -1147,19 +1147,28 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           数据场的每个字节不是"裸发"的——UART 串口会把每个 byte 包成 <strong>10 bit 的帧</strong>（Start + 8 data + Stop）。
           LIN 物理层把 UART 的 TX 信号连到 LIN 收发器芯片，再由收发器驱动单线总线。
         </p>
-        <div style="background:var(--code-bg);border-radius:8px;padding:1rem;font-family:var(--font-mono);font-size:.82rem;text-align:center;line-height:2;margin-bottom:1rem">
-          <span style="color:var(--success)">[Start=0]</span>
-          <span style="color:var(--text)">[D0]</span>
-          <span style="color:var(--text)">[D1]</span>
-          <span style="color:var(--text)">[D2]</span>
-          <span style="color:var(--text)">[D3]</span>
-          <span style="color:var(--text)">[D4]</span>
-          <span style="color:var(--text)">[D5]</span>
-          <span style="color:var(--text)">[D6]</span>
-          <span style="color:var(--text)">[D7]</span>
-          <span style="color:var(--danger)">[Stop=1]</span>
-          <br/>
-          <span style="font-size:.75rem;color:var(--text3)">← LSB first → 9600/19200 bps (LIN 典型)</span>
+        <div style="background:var(--card2);border-radius:8px;padding:1rem;font-size:.82rem;line-height:1.8;margin-bottom:1rem">
+          <strong style="color:var(--text)">📡 UART 串口帧 — 每个字节 = 10 bit 时长</strong><br/>
+          <span style="color:var(--text2)">Start = 0（拉低），8 个数据位 LSB 先发，Stop = 1（拉高）</span>
+          <table class="lin-frame-table" style="margin:.4rem 0 0">
+            <tr>
+              <td class="byte-nad" style="font-size:.72rem">Start<br/>0</td>
+              <td class="byte-data" style="font-size:.72rem">D0</td>
+              <td class="byte-data" style="font-size:.72rem">D1</td>
+              <td class="byte-data" style="font-size:.72rem">D2</td>
+              <td class="byte-data" style="font-size:.72rem">D3</td>
+              <td class="byte-data" style="font-size:.72rem">D4</td>
+              <td class="byte-data" style="font-size:.72rem">D5</td>
+              <td class="byte-data" style="font-size:.72rem">D6</td>
+              <td class="byte-data" style="font-size:.72rem">D7</td>
+              <td class="byte-pci" style="font-size:.72rem">Stop<br/>1</td>
+            </tr>
+          </table>
+          <div style="margin-top:.4rem;font-size:.75rem;color:var(--text3)">
+            <span style="background:#dbeafe;padding:2px 8px;border-radius:3px">蓝 = Start/Stop 帧边界</span>
+            <span style="background:#d1fae5;padding:2px 8px;border-radius:3px;margin-left:6px">绿 = 数据位 (LSB→MSB)</span>
+            <span style="margin-left:6px">9600/19200 bps — 1 字节 ≈ 0.52 ms</span>
+          </div>
         </div>
         <div class="lin-info-box">
           <strong>示例:</strong> 发送字节 <code>0x35</code> (二进制 <code>0011 0101</code>)<br/>
