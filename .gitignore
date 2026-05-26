@@ -28,10 +28,22 @@ compile_commands.json
 *.lib
 *.pdb
 
-# Sisyphus workflow (internal)
-.sisyphus/run-continuation/
-.sisyphus/evidence/
-.sisyphus/drafts/
+# Node / Playwright
+node_modules/
+.playwright-mcp/
+package.json
+package-lock.json
+
+# Legacy build artifacts
+build_fresh/
+build-release/
+
+# Sisyphus internal (correct paths)
+.omo/boulder.json
+.omo/evidence/
+.omo/drafts/
+.omo/notepads/
+.omo/run-continuation/
 
 # Temp
 *.log
