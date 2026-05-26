@@ -175,7 +175,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .quiz-question { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.2rem; }
 .quiz-options { display: flex; flex-direction: column; gap: 8px; }
 .quiz-option { padding: .8rem 1rem; border: 2px solid var(--border); border-radius: 8px;
-  background: var(--card); cursor: pointer; transition: all .2s; font-size: .9rem;
+  background: var(--card); color: var(--text); cursor: pointer; transition: all .2s; font-size: .9rem;
   text-align: left; }
 .quiz-option:hover { border-color: var(--primary); background: var(--primary-light); }
 .quiz-option.correct { border-color: var(--success); background: #d1fae5; color: #065f46; }
@@ -1144,7 +1144,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <div class="lin-section">
         <h3>🔌 2. 每个字节如何通过 UART 发送</h3>
         <p style="font-size:.9rem;color:var(--text2);line-height:1.7;margin-bottom:1rem">
-          数据场的每个字节不是"裸发"的——UART 串口会把每个 byte 包成 <strong>10 bit 的帧</strong>（Start + 8 data + Stop）。
+          数据场的每个字节不是"裸发"的——UART 串口会把每个 byte 包成 <strong>10 bit 的帧</strong>（Start + 8 bit + Stop）。
           LIN 物理层把 UART 的 TX 信号连到 LIN 收发器芯片，再由收发器驱动单线总线。
         </p>
         <div style="background:var(--card2);border-radius:8px;padding:1rem;font-size:.82rem;line-height:1.8;margin-bottom:1rem">
