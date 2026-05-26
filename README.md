@@ -28,12 +28,12 @@ C11 实现的 ISO 14229-1 统一诊断服务，运行在 LIN 总线上的 ECU。
 诊断请求（下行）与响应（上行）的双向数据流。
 
 ```mermaid
-flowchart LR
-    REQ["📥 请求\nLIN 总线 → HAL UART\n→ LIN 传输层 (N_PCI 重组)\n→ UDS 解析器"]
+graph LR
+    REQ["[请求]\nLIN 总线 -> HAL UART\n-> LIN 传输层 (N_PCI 重组)\n-> UDS 解析器"]
     REQ --> PROC
-    PROC["⚙️ 服务处理\n会话管理 → 安全访问\n→ 服务分发 → 26 个服务处理器"]
+    PROC["[处理]\n会话管理 -> 安全访问\n-> 服务分发 -> 26 个服务"]
     PROC --> RSP
-    RSP["📤 响应\nUDS 序列化器\n→ LIN 传输层 (N_PCI 拆分)\n→ HAL UART → LIN 总线"]
+    RSP["[响应]\nUDS 序列化器\n-> LIN 传输层 (N_PCI 拆分)\n-> HAL UART -> LIN 总线"]
 ```
 
 ### 关键设计决策

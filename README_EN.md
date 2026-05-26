@@ -28,12 +28,12 @@ A complete diagnostic stack built for learning: from physical UART frames up thr
 Bidirectional data flow for diagnostic requests (downstream) and responses (upstream).
 
 ```mermaid
-flowchart LR
-    REQ["📥 Request\nLIN Bus → HAL UART\n→ LIN Transport (N_PCI reassembly)\n→ UDS Parser"]
+graph LR
+    REQ["[Request]\nLIN Bus -> HAL UART\n-> LIN Transport (N_PCI reassembly)\n-> UDS Parser"]
     REQ --> PROC
-    PROC["⚙️ Processing\nSession → Security Access\n→ Dispatch → 26 Service Handlers"]
+    PROC["[Processing]\nSession -> Security Access\n-> Dispatch -> 26 Services"]
     PROC --> RSP
-    RSP["📤 Response\nUDS Serializer\n→ LIN Transport (N_PCI segment)\n→ HAL UART → LIN Bus"]
+    RSP["[Response]\nUDS Serializer\n-> LIN Transport (N_PCI segmentation)\n-> HAL UART -> LIN Bus"]
 ```
 
 ### Key Design Decisions
