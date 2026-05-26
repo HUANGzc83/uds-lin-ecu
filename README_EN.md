@@ -4,6 +4,7 @@
 
 [![ISO 14229-1](https://img.shields.io/badge/ISO--14229--1:2020-blue)](doc/)
 [![Language](https://img.shields.io/badge/C-C11-green)]()
+[![License](https://img.shields.io/badge/License-MIT-green)]()
 
 > ⚠️ **AI-Generated Notice**: This project is AI-assisted and intended for educational reference only — for learning UDS diagnostic protocol (ISO 14229-1) and LIN bus communication. Not for production use.
 
@@ -28,12 +29,12 @@ A complete diagnostic stack built for learning: from physical UART frames up thr
 Bidirectional data flow for diagnostic requests (downstream) and responses (upstream).
 
 ```mermaid
-graph LR
-    REQ["[Request]\nLIN Bus -> HAL UART\n-> LIN Transport (N_PCI reassembly)\n-> UDS Parser"]
+flowchart LR
+    REQ["📥 Request\nLIN Bus → HAL UART\n→ LIN Transport (N_PCI reassembly)\n→ UDS Parser"]
     REQ --> PROC
-    PROC["[Processing]\nSession -> Security Access\n-> Dispatch -> 26 Services"]
+    PROC["⚙️ Processing\nSession → Security Access\n→ Dispatch → 26 Service Handlers"]
     PROC --> RSP
-    RSP["[Response]\nUDS Serializer\n-> LIN Transport (N_PCI segmentation)\n-> HAL UART -> LIN Bus"]
+    RSP["📤 Response\nUDS Serializer\n→ LIN Transport (N_PCI segmentation)\n→ HAL UART → LIN Bus"]
 ```
 
 ### Key Design Decisions
@@ -43,45 +44,57 @@ graph LR
 - **HAL abstraction** — transport layer decoupled from physical layer via `hal_uart.h` interface, swappable with real UART drivers or desktop simulation.
 - **POSIX mode** — optionally compile into a Linux executable with real UART (`/dev/ttyS0`), timer (`clock_gettime`), and NVM (file I/O).
 
+#### Core Module Index
+
+| Module | Header | Implementation |
+|--------|--------|----------------|
+| HAL abstraction | `inc/hal/hal_uart.h` | `src/hal/hal_stubs.c` |
+| LIN transport | `inc/uds/uds_lin_transport.h` | `src/uds/uds_lin_transport.c` |
+| UDS core | `inc/uds/uds_core.h` | `src/uds/uds_core.c` |
+| Session management | `inc/uds/uds_session.h` | `src/uds/uds_session.c` |
+| Security access | `inc/uds/uds_security.h` | `src/uds/uds_security.c` |
+| DTC management | `inc/uds/uds_dtc.h` | `src/uds/uds_dtc.c` |
+| DID data store | `inc/uds/uds_data.h` | `src/uds/uds_data.c` |
+
 ## Supported Services
 
 Based on ISO 14229-1:2020. 26 standard UDS services listed by functional group.
 
-| Service | SID | Module | Status |
-|---------|-----|--------|--------|
+| Service | SID | Module |
+|---------|-----|--------|
 | **Diagnostic & Communication Management** |
-| DiagnosticSessionControl | 0x10 | uds_svc_diagcomm | Complete |
-| ECUReset | 0x11 | uds_svc_diagcomm | Complete |
-| SecurityAccess | 0x27 | uds_security | Complete |
-| CommunicationControl | 0x28 | uds_svc_diagcomm | Complete |
-| TesterPresent | 0x3E | uds_svc_diagcomm | Complete |
-| ControlDTCSetting | 0x85 | uds_svc_diagcomm | Complete |
-| ResponseOnEvent | 0x86 | uds_svc_diagcomm | Complete |
-| LinkControl | 0x87 | uds_svc_diagcomm | Complete |
+| DiagnosticSessionControl | 0x10 | uds_svc_diagcomm |
+| ECUReset | 0x11 | uds_svc_diagcomm |
+| SecurityAccess | 0x27 | uds_security |
+| CommunicationControl | 0x28 | uds_svc_diagcomm |
+| TesterPresent | 0x3E | uds_svc_diagcomm |
+| ControlDTCSetting | 0x85 | uds_svc_diagcomm |
+| ResponseOnEvent | 0x86 | uds_svc_diagcomm |
+| LinkControl | 0x87 | uds_svc_diagcomm |
 | **Data Transmission** |
-| ReadDataByIdentifier | 0x22 | uds_svc_data | Complete |
-| WriteDataByIdentifier | 0x2E | uds_data | Complete |
-| ReadMemoryByAddress | 0x23 | uds_svc_upload | Complete |
-| ReadScalingDataByIdentifier | 0x24 | uds_svc_data | Complete |
-| WriteMemoryByAddress | 0x3D | uds_svc_data | Complete |
+| ReadDataByIdentifier | 0x22 | uds_svc_data |
+| WriteDataByIdentifier | 0x2E | uds_data |
+| ReadMemoryByAddress | 0x23 | uds_svc_upload |
+| ReadScalingDataByIdentifier | 0x24 | uds_svc_data |
+| WriteMemoryByAddress | 0x3D | uds_svc_data |
 | **Stored Data Transmission** |
-| ReadDataByPeriodicIdentifier | 0x2A | uds_svc_stored | Complete |
-| DynamicallyDefineDataIdentifier | 0x2C | uds_svc_stored | Complete |
-| ClearDiagnosticInformation | 0x14 | uds_dtc | Complete |
-| ReadDTCInformation | 0x19 | uds_dtc | Complete |
+| ReadDataByPeriodicIdentifier | 0x2A | uds_svc_stored |
+| DynamicallyDefineDataIdentifier | 0x2C | uds_svc_stored |
+| ClearDiagnosticInformation | 0x14 | uds_dtc |
+| ReadDTCInformation | 0x19 | uds_dtc |
 | **Input/Output Control** |
-| InputOutputControlByIdentifier | 0x2F | uds_svc_io | Complete |
+| InputOutputControlByIdentifier | 0x2F | uds_svc_io |
 | **Remote Routine Activation** |
-| RoutineControl | 0x31 | uds_svc_routine | Complete |
+| RoutineControl | 0x31 | uds_svc_routine |
 | **Upload / Download** |
-| RequestDownload | 0x34 | uds_svc_upload | Complete |
-| RequestUpload | 0x35 | uds_svc_upload | Complete |
-| TransferData | 0x36 | uds_svc_upload | Complete |
-| RequestTransferExit | 0x37 | uds_svc_upload | Complete |
-| RequestFileTransfer | 0x38 | uds_svc_upload | Complete |
+| RequestDownload | 0x34 | uds_svc_upload |
+| RequestUpload | 0x35 | uds_svc_upload |
+| TransferData | 0x36 | uds_svc_upload |
+| RequestTransferExit | 0x37 | uds_svc_upload |
+| RequestFileTransfer | 0x38 | uds_svc_upload |
 | **Authentication & Security** |
-| Authentication | 0x29 | uds_svc_auth | Complete |
-| SecuredDataTransmission | 0x84 | (stub) | Stub |
+| Authentication | 0x29 | uds_svc_auth |
+| SecuredDataTransmission | 0x84 | (stub) |
 
 ## Learning Tools
 

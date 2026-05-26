@@ -4,6 +4,7 @@
 
 [![ISO 14229-1](https://img.shields.io/badge/ISO--14229--1:2020-blue)](doc/)
 [![Language](https://img.shields.io/badge/C-C11-green)]()
+[![License](https://img.shields.io/badge/License-MIT-green)]()
 
 > ⚠️ **AI Coding 声明**：本项目由 AI 辅助生成，仅供参考学习 UDS 诊断协议 (ISO 14229-1) 和 LIN 总线通信。不适用于生产环境。
 
@@ -28,12 +29,12 @@ C11 实现的 ISO 14229-1 统一诊断服务，运行在 LIN 总线上的 ECU。
 诊断请求（下行）与响应（上行）的双向数据流。
 
 ```mermaid
-graph LR
-    REQ["[请求]\nLIN 总线 -> HAL UART\n-> LIN 传输层 (N_PCI 重组)\n-> UDS 解析器"]
+flowchart LR
+    REQ["📥 请求\nLIN 总线 → HAL UART\n→ LIN 传输层 (N_PCI 重组)\n→ UDS 解析器"]
     REQ --> PROC
-    PROC["[处理]\n会话管理 -> 安全访问\n-> 服务分发 -> 26 个服务"]
+    PROC["⚙️ 服务处理\n会话管理 → 安全访问\n→ 服务分发 → 26 个服务处理器"]
     PROC --> RSP
-    RSP["[响应]\nUDS 序列化器\n-> LIN 传输层 (N_PCI 拆分)\n-> HAL UART -> LIN 总线"]
+    RSP["📤 响应\nUDS 序列化器\n→ LIN 传输层 (N_PCI 拆分)\n→ HAL UART → LIN 总线"]
 ```
 
 ### 关键设计决策
@@ -43,45 +44,57 @@ graph LR
 - **HAL 抽象** — 传输层通过 `hal_uart.h` 接口与物理层解耦，可替换为真实 UART 驱动或桌面模拟。
 - **POSIX 模式** — 可选编译为带真实 UART (`/dev/ttyS0`), 定时器 (`clock_gettime`), NVM (文件 I/O) 的 Linux 可执行文件。
 
+#### 核心模块索引
+
+| 模块 | 头文件 | 实现 |
+|------|--------|------|
+| HAL 抽象 | `inc/hal/hal_uart.h` | `src/hal/hal_stubs.c` |
+| LIN 传输层 | `inc/uds/uds_lin_transport.h` | `src/uds/uds_lin_transport.c` |
+| UDS 核心 | `inc/uds/uds_core.h` | `src/uds/uds_core.c` |
+| 会话管理 | `inc/uds/uds_session.h` | `src/uds/uds_session.c` |
+| 安全访问 | `inc/uds/uds_security.h` | `src/uds/uds_security.c` |
+| DTC 管理 | `inc/uds/uds_dtc.h` | `src/uds/uds_dtc.c` |
+| DID 数据 | `inc/uds/uds_data.h` | `src/uds/uds_data.c` |
+
 ## 支持的服务
 
 基于 ISO 14229-1:2020。26 个标准 UDS 服务按功能分类列出。
 
-| 服务 | SID | 模块 | 状态 |
-|------|-----|------|------|
+| 服务 | SID | 模块 |
+|------|-----|------|
 | **诊断与通信管理** |
-| DiagnosticSessionControl | 0x10 | uds_svc_diagcomm | 完整 |
-| ECUReset | 0x11 | uds_svc_diagcomm | 完整 |
-| SecurityAccess | 0x27 | uds_security | 完整 |
-| CommunicationControl | 0x28 | uds_svc_diagcomm | 完整 |
-| TesterPresent | 0x3E | uds_svc_diagcomm | 完整 |
-| ControlDTCSetting | 0x85 | uds_svc_diagcomm | 完整 |
-| ResponseOnEvent | 0x86 | uds_svc_diagcomm | 完整 |
-| LinkControl | 0x87 | uds_svc_diagcomm | 完整 |
+| DiagnosticSessionControl | 0x10 | uds_svc_diagcomm |
+| ECUReset | 0x11 | uds_svc_diagcomm |
+| SecurityAccess | 0x27 | uds_security |
+| CommunicationControl | 0x28 | uds_svc_diagcomm |
+| TesterPresent | 0x3E | uds_svc_diagcomm |
+| ControlDTCSetting | 0x85 | uds_svc_diagcomm |
+| ResponseOnEvent | 0x86 | uds_svc_diagcomm |
+| LinkControl | 0x87 | uds_svc_diagcomm |
 | **数据传输** |
-| ReadDataByIdentifier | 0x22 | uds_svc_data | 完整 |
-| WriteDataByIdentifier | 0x2E | uds_data | 完整 |
-| ReadMemoryByAddress | 0x23 | uds_svc_upload | 完整 |
-| ReadScalingDataByIdentifier | 0x24 | uds_svc_data | 完整 |
-| WriteMemoryByAddress | 0x3D | uds_svc_data | 完整 |
+| ReadDataByIdentifier | 0x22 | uds_svc_data |
+| WriteDataByIdentifier | 0x2E | uds_data |
+| ReadMemoryByAddress | 0x23 | uds_svc_upload |
+| ReadScalingDataByIdentifier | 0x24 | uds_svc_data |
+| WriteMemoryByAddress | 0x3D | uds_svc_data |
 | **已存储数据传输** |
-| ReadDataByPeriodicIdentifier | 0x2A | uds_svc_stored | 完整 |
-| DynamicallyDefineDataIdentifier | 0x2C | uds_svc_stored | 完整 |
-| ClearDiagnosticInformation | 0x14 | uds_dtc | 完整 |
-| ReadDTCInformation | 0x19 | uds_dtc | 完整 |
+| ReadDataByPeriodicIdentifier | 0x2A | uds_svc_stored |
+| DynamicallyDefineDataIdentifier | 0x2C | uds_svc_stored |
+| ClearDiagnosticInformation | 0x14 | uds_dtc |
+| ReadDTCInformation | 0x19 | uds_dtc |
 | **输入输出控制** |
-| InputOutputControlByIdentifier | 0x2F | uds_svc_io | 完整 |
+| InputOutputControlByIdentifier | 0x2F | uds_svc_io |
 | **远程例程激活** |
-| RoutineControl | 0x31 | uds_svc_routine | 完整 |
+| RoutineControl | 0x31 | uds_svc_routine |
 | **上传 / 下载** |
-| RequestDownload | 0x34 | uds_svc_upload | 完整 |
-| RequestUpload | 0x35 | uds_svc_upload | 完整 |
-| TransferData | 0x36 | uds_svc_upload | 完整 |
-| RequestTransferExit | 0x37 | uds_svc_upload | 完整 |
-| RequestFileTransfer | 0x38 | uds_svc_upload | 完整 |
+| RequestDownload | 0x34 | uds_svc_upload |
+| RequestUpload | 0x35 | uds_svc_upload |
+| TransferData | 0x36 | uds_svc_upload |
+| RequestTransferExit | 0x37 | uds_svc_upload |
+| RequestFileTransfer | 0x38 | uds_svc_upload |
 | **认证与安全** |
-| Authentication | 0x29 | uds_svc_auth | 完整 |
-| SecuredDataTransmission | 0x84 | (stub) | 桩实现 |
+| Authentication | 0x29 | uds_svc_auth |
+| SecuredDataTransmission | 0x84 | (stub) |
 
 ## 学习工具
 
