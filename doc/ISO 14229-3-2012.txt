@@ -1,0 +1,2201 @@
+INTERNATIONAL 
+STANDARD
+
+ISO
+14229-3
+
+First edition
+2012-12-01
+
+Road vehicles — Unified diagnostic 
+services (UDS) —
+
+Unified diagnostic services on CAN 
+implementation (UDSonCAN)
+Part 3:
+
+Véhicules routiers — Services de diagnostic unifiés (SDU) —
+
+Partie 3: SDU sur l’implémentation du gestionnaire de réseau de 
+communication (SDUsurCAN)
+
+Reference number
+ISO 14229-3:2012(E)
+
+© ISO 2012
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ISO 14229-3:2012(E)
+
+COPYRIGHT PROTECTED DOCUMENT
+
+© ISO 2012
+All rights reserved. Unless otherwise specified, no part of this publication may be reproduced or utilized in any form or by any 
+means, electronic or mechanical, including photocopying and microfilm, without permission in writing from either ISO at the 
+address below or ISO’s member body in the country of the requester.
+
+ISO copyright office
+Case postale 56 • CH-1211 Geneva 20
+Tel. + 41 22 749 01 11
+Fax + 41 22 749 09 47
+E-mail copyright@iso.org
+Web www.iso.org
+
+Published in Switzerland
+
+ii
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+Contents 
+
+Foreword
+
+ISO 14229-3:2012(E)
+
+Page
+iv
+
+Introduction
+
+ ........................................................................................................................................................................................................................................
+
+v
+
+1 
+
+2 
+
+3 
+
+4 
+
+5 
+
+6 
+
+7 
+
+8 
+
+9 
+
+Scope
+
+ ..................................................................................................................................................................................................................................
+
+1
+
+Normative references
+
+ .................................................................................................................................................................................................................................
+
+Terms, definitions and abbreviated terms
+
+ ......................................................................................................................................................................................
+
+1
+
+1
+
+ ................................................................................................................................
+
+3.1 
+Conventions
+3.2 
+Document overview
+
+Terms and definitions ....................................................................................................................................................................... 1
+2
+Abbreviated terms ............................................................................................................................................................................... 1
+2
+
+ ...............................................................................................................................................................................................................
+
+Unified diagnostic services implementation on CAN
+
+...........................................................................................................................................................................................
+
+4
+
+6.1 
+6.2 
+6.3 
+Application layer requirements
+6.4 
+
+General ........................................................................................................................................................................................................... 4
+UDS on CAN services overview ................................................................................................................................................. 4
+ResponseOnEvent (0x86) service DoCAN implementation requirements ......................................... 5
+13
+ReadDataByPeriodicIdentifier (0x2A) service ............................................................................................................ 7
+
+ ........................................................................................................................................................
+
+ .....................................................................................................
+
+7.1 
+7.2 
+Presentation layer requirements
+7.3 
+Session layer requirements
+
+Application layer services .......................................................................................................................................................... 13
+Application layer protocol .......................................................................................................................................................... 13
+13
+Application layer timing............................................................................................................................................................... 13
+13
+
+ .....................................................................................................................................................
+
+10 
+
+Transport/Network layer interface adaptation
+
+ ....................................................................................................................................................................
+
+13
+
+11 
+
+10.1  General information ........................................................................................................................................................................ 13
+Data link layer diagnostic implementation requirements
+15
+10.2  DoCAN Transport/Network layer interface adaptation ...................................................................................14
+
+ ................................................................................................................
+
+Bibliography
+
+11.1  Usage of legislated 11-bit OBD CAN Identifiers for enhanced diagnostics ......................................15
+16
+11.2  Usage of legislated 29-bit OBD CAN Identifiers for enhanced diagnostics ......................................15
+
+ .............................................................................................................................................................................................................................
+
+ ....................................................................................
+
+© ISO 2012 – All rights reserved 
+
+iii
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+Foreword
+
+ISO (the International Organization for Standardization) is a worldwide federation of national standards 
+bodies  (ISO  member  bodies).  The  work  of  preparing  International  Standards  is  normally  carried  out 
+through  ISO  technical  committees.  Each  member  body  interested  in  a  subject  for  which  a  technical 
+committee  has  been  established  has  the  right  to  be  represented  on  that  committee.  International 
+organizations,  governmental  and  non-governmental,  in  liaison  with  ISO,  also  take  part  in  the  work. 
+ISO  collaborates  closely  with  the  International  Electrotechnical  Commission  (IEC)  on  all  matters  of 
+electrotechnical standardization.
+
+International Standards are drafted in accordance with the rules given in the ISO/IEC Directives, Part 2.
+
+The  main  task  of  technical  committees  is  to  prepare  International  Standards.  Draft  International 
+Standards  adopted  by  the  technical  committees  are  circulated  to  the  member  bodies  for  voting. 
+Publication  as  an  International  Standard  requires  approval  by  at  least  75  %  of  the  member  bodies 
+casting a vote.
+
+Attention is drawn to the possibility that some of the elements of this document may be the subject of 
+patent rights. ISO shall not be held responsible for identifying any or all such patent rights.
+Electrical and electronic equipment
+ISO  14229-3  was  prepared  by  Technical  Committee  ISO/TC  22, 
+
+Road  vehicles
+
+,  Subcommittee  SC  3, 
+Road  vehicles  —  Unified  diagnostic 
+
+.
+
+services (UDS)
+ISO  14229  consists  of  the  following  parts,  under  the  general  title 
+
+Part 1: Specification and requirements
+
+:
+
+Part 2: Session layer services
+
+Part 3: Unified diagnostic services on CAN implementation (UDSonCAN)
+
+Part 4: Unified diagnostic services on FlexRay implementation (UDSonFR)
+
+Part 5: Unified diagnostic services on Internet Protocol implementation (UDSonIP)
+
+Part 6: Unified diagnostic services on K-Line implementation (UDSonK-Line)
+
+— 
+
+— 
+
+— 
+
+— 
+
+— 
+
+— 
+
+The following parts are under preparation / are planned:
+
+Part 7: Unified diagnostic services on Local Interconnet Network implementation(UDSonLIN)
+
+— 
+
+iv
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+ISO 14229-3:2012(E)
+
+Introduction
+
+This part of ISO 14229 has been established in order to enable the implementation of unified diagnostic 
+services, as specified in ISO 14229-3, on Controller Area Networks (UDSonCAN).
+
+To achieve this, it is based on the Open Systems Interconnection (OSI) Basic Reference Model specified in 
+ISO/IEC 7498-1 and ISO/IEC 10731, which structures communication systems into seven layers. When 
+mapped on this model, the services specified by ISO 14229 are divided into
+
+—  Application layer (layer 7):
+
+—  Vehicle manufacturer enhanced diagnostics: ISO 14229-1, ISO 14229-3,
+
+—  Legislated OBD: ISO 15031-5,
+
+—  Legislated WWH-OBD: ISO 14229-1 / ISO 27145-3;
+
+—  Presentation layer (layer 6):
+
+—  Vehicle manufacturer enhanced diagnostics: vehicle manufacturer specific,
+
+—  Legislated OBD: SAE J1930-DA, SAE J1979-DA, SAE J2012-DA,
+
+—  Legislated  WWH-OBD:  ISO  27145-2  with  reference  to  SAE  J1930-DA,  SAE  J1939,  Companion 
+Spreadsheet (SPNs), SAE J1939-73:2010, Appendix A (FMIs), SAE J1979-DA and SAE J2012-DA;
+
+—  Session layer services (layer 5):
+
+—  Vehicle manufacturer enhanced diagnostics: ISO 14229-2,
+
+—  Legislated OBD: ISO 14229-2,
+
+—  Legislated WWH-OBD: ISO 14229-2;
+
+—  Transport layer services (layer 4):
+
+—  Vehicle manufacturer enhanced diagnostics: ISO 15765-2,
+
+—  Legislated OBD: ISO 15765-2, ISO 15765-4
+
+—  Legislated WWH-OBD: ISO 27145-4;
+
+—  Network layer services (layer 3):
+
+—  Vehicle manufacturer enhanced diagnostics: ISO 15765-2,
+
+—  Legislated OBD: ISO 15765-2, ISO 15765-4
+
+—  Legislated WWH-OBD: ISO 27145-4;
+
+—  Data link layer (layer 2):
+
+—  Vehicle manufacturer enhanced diagnostics: ISO 11898-1, ISO 11898-2, ISO 11898-3, ISO 11898-5,
+
+—  Legislated OBD: ISO 11898-1, ISO 11898-2, ISO 15765-4,
+
+—  Legislated WWH-OBD: ISO 27145-4;
+
+—  Physical layer (layer 3):
+
+—  Vehicle manufacturer enhanced diagnostics: ISO 11898-1, ISO 11898-2, ISO 11898-3, ISO 11898-5,
+
+—  Legislated OBD: ISO 11898-1, ISO 11898-2, ISO 15765-4,
+
+© ISO 2012 – All rights reserved 
+
+v
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+—  Legislated WWH-OBD: ISO 27145-4;
+
+in accordance with Table 1.
+Table 1 — DoCAN enhanced diagnostics, legislated OBD and WWH-OBD specification reference 
+applicable to the OSI layers
+
+Applicability
+
+OSI 7 layers
+
+Vehicle manufac-
+turer enhanced 
+diagnostics
+
+Legislated 
+OBD
+
+(On-Board 
+Diagnostics)
+
+Legislated WWH-OBD
+
+(On-Board Diagnostics)
+
+Application 
+(layer 7)
+
+ISO 14229-1, ISO/
+FDIS 14229-3
+
+Presentation 
+(layer 6)
+
+vehicle manufac-
+turer specific
+
+ISO 15031-5
+
+ISO 14229-1, ISO 27145-3
+
+SAE J1930-DA, 
+SAE J1979-DA, 
+SAE J2012-DA
+
+ISO 27145-2 SAE J1930-DA, 
+SAE J1939 Companion Spreadsheet (SPNs), 
+SAE J1939 −73:2010, Appendix A (FMIs), 
+SAE J1979-DA, SAE J2012-DA
+
+Seven layer 
+according to 
+ISO/IEC 7498-1 
+and ISO/
+IEC 10731
+
+Session 
+(layer 5)
+
+Transport 
+(layer 4)
+
+Network 
+(layer 3)
+
+Data link 
+(layer 2)
+
+Physical 
+(layer 1)
+
+ISO 14229-2
+
+ISO 15765-2
+
+ISO 15765-2, 
+ISO 15765-4
+
+ISO 15765-2, 
+ISO 15765-4
+
+ISO 11898-1, 
+ISO 11898-2, 
+ISO 11898-3, 
+ISO 11898-5 
+
+ISO 11898-1, 
+ISO 11898-2, 
+ISO 15765-4
+
+ISO 11898-1, 
+ISO 11898-2, 
+ISO 15765-4
+
+ISO 27145-4
+
+ISO 13400-2
+
+ISO 13400-3, 
+IEEE 802.3
+
+vi
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+ 
+ 
+INTERNATIONAL STANDARD 
+
+ISO 14229-3:2012(E)
+
+Road vehicles — Unified diagnostic services (UDS) —
+
+Unified diagnostic services on CAN implementation 
+(UDSonCAN)
+Part 3:
+
+1  Scope
+
+This  part  of  ISO  14229  specifies  the  implementation  of  a  common  set  of  unified  diagnostic  services 
+(UDS) on controller area networks (CAN) in road vehicles (UDSonCAN).
+
+UDSonCAN references ISO 14229-1 and ISO 14229-2 and specifies implementation requirements of the 
+diagnostic services to be used for diagnostic communication over CAN.
+
+NOTE 
+
+UDSonCAN does not specify any requirement for the in-vehicle CAN bus architecture.
+
+This part of ISO 14229 does not include any redundant information of the documents as listed in the 
+Introduction. It focuses on
+
+—  additional requirements specific to the implementation of UDS on the CAN network, and
+
+—  specific restrictions in the implementation of UDS on the CAN network.
+2  Normative references
+
+The  following  documents,  in  whole  or  in  part,  are  normatively  referenced  in  this  document  and  are 
+indispensable  for  its  application.  For  dated  references,  only  the  edition  cited  applies.  For  undated 
+references, the latest edition of the referenced document (including any amendments) applies.
+
+Road vehicles — Unified diagnostic services (UDS) — Part 1: Specification and requirements
+
+ISO 14229-1, 
+
+Road vehicles — Unified diagnostic services (UDS) — Part 2: Session layer services
+
+Road vehicles — Diagnostic communication over Controller Area Network (DoCAN) — Part 1: 
+
+ISO 14229-2, 
+General information and use case definition
+ISO 15765-1, 
+
+Road vehicles — Diagnostic communication over Controller Area Network (DoCAN) — Part 2: 
+
+Transport protocol and network layer services
+ISO 15765-2, 
+
+Road vehicles — Diagnostic communication over Controller Area Network (DoCAN) — Part 4: 
+
+Requirements for emissions-related systems
+ISO 15765-4, 
+
+3  Terms, definitions and abbreviated terms
+
+3.1  Terms and definitions
+
+For  the  purposes  of  this  document,  the  terms  and  definitions  given  in  ISO  14229-1,  ISO  14229-2, 
+ISO 15765-1, ISO 15765-2 and ISO 15765-4 apply.
+
+3.2  Abbreviated terms
+
+© ISO 2012 – All rights reserved 
+
+1
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+CF
+
+DA
+
+consecutive frame
+
+destination address
+
+DLC
+
+data length code
+
+FF
+
+FC
+
+ID
+
+NA
+
+SA
+
+SF
+
+SM
+
+first frame
+
+flow control
+
+identifier
+
+network address
+
+source address
+
+single frame
+
+subnet mask
+
+SOM
+
+start of message
+
+STRT
+
+serviceToRespondTo
+
+TA
+
+UDS
+
+target address
+
+unified diagnostic services
+
+USDT
+
+unacknowledged segmented data transfer
+
+UUDT
+
+unacknowledged unsegmented data transfer
+
+4  Conventions
+
+This  part  of  ISO  14229  is  based  on  the  conventions  discussed  in  the  OSI  Service  Conventions 
+(ISO/IEC 10731:1994) as they apply for diagnostic services.
+5  Document overview
+
+Figure 1 illustrates the documents required to implement UDSonCAN.
+
+2 
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+Uni(cid:15)ied Diagnostic Services (UDS) 
+subset
+
+OSI Layer 7 
+Application
+
+ISO 14229-1 UDS
+speci(cid:15)ication and 
+requirements
+
+ISO 14229-3 UDS
+UDSonCAN
+
+OSI Layer 6 
+Presentation
+
+OSI Layer 5 
+Session
+
+OSI Layer 4 
+Transport
+
+OSI Layer 3 
+Network
+
+OSI Layer 2 
+Data Link
+
+OSI Layer 1
+Physical
+
+vehicle manufacturer speci(cid:15)ic
+
+ISO 14229-2 UDS
+session layer services
+
+Standardized Service Primitive Interface
+
+ISO 14229-3 UDS –  
+UDSonCAN 
+implementation
+
+DoCAN
+
+ISO 15765-2 DoCAN
+transport protocol  
+and 
+network
+layer services
+
+ISO 11898-1 CAN
+data link layer and physical 
+signalling
+
+ISO 11898  CAN
+
+Part 2: High-speed medium access unit
+Part 3: Low-speed, fault-tolerant, medium- 
+dependent interface
+Part 5: High-speed medium access unit 
+with low-power mode
+
+Figure 1 — UDSonCAN document reference according to OSI model
+
+© ISO 2012 – All rights reserved 
+
+3
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+6  Unified diagnostic services implementation on CAN
+
+6.1  General
+
+This  clause  defines  how  the  diagnostic  services  as  defined  in  ISO  14229-1  apply  to  DoCAN.  For  each 
+applicable service, the applicable sub-function and data parameters are defined.
+
+The sub-function parameter definitions take into account that the most significant bit is used for the 
+
+NOTE 
+suppressPosRspMsgIndicationBit parameter as defined in ISO 14229-1.
+6.2  UDS on CAN services overview
+
+The purpose of Table 2 is to reference all ISO 14229-1 and ISO 14229-2 services as they are applicable 
+for an implementation in ISO 14229-3, UDSonCAN. Table 2 contains the sum of all applicable services. 
+Certain  applications  using  this  part  of  ISO  14229  to  implement  UDSonCAN  may  restrict  the  number 
+of useable services and may categorize them in certain application areas/diagnostic sessions (default 
+session, programming session, etc.).
+
+Services in Table 2 that are marked “No CAN specific requirements” shall be implemented as defined 
+in ISO 14229-1 and ISO 14229-2 with no additional restrictions. Services that are marked “CAN specific 
+requirements” shall be implemented as defined by the subclause listed in the Table 2 entry.
+Table 2 — Overview of applicable ISO 14229-1, Unified diagnostic services and data ranges
+
+Diagnostic service name
+
+Comment
+
+Reference in this 
+document
+
+(ISO 14229-1)
+
+Diagnostic and Communication Management Functional Unit
+
+DiagnosticSessionControl
+
+No CAN specific requirements
+
+ECUReset
+
+SecurityAccess
+
+No CAN specific requirements
+
+No CAN specific requirements
+
+CommunicationControl
+
+No CAN specific requirements
+
+TesterPresent
+
+No CAN specific requirements
+
+SecuredData-Transmission
+
+No CAN specific requirements
+
+ControlDTCSetting
+
+ResponseOnEvent
+
+LinkControl
+
+No CAN specific requirements
+
+CAN specific requirements
+
+Data Transmission Functional Unit
+No CAN specific requirements
+
+ReadDataByIdentifier
+
+No CAN specific requirements
+
+ReadMemoryByAddress
+
+No CAN specific requirements
+
+ReadScalingDataByIdentifier
+
+No CAN specific requirements
+
+—
+
+—
+
+—
+
+—
+
+—
+
+—
+
+—
+
+see 6.3
+
+—
+
+—
+
+—
+
+—
+
+ReadDataByPeriodicIdentifier
+
+CAN specific requirements
+
+see 6.4
+
+DynamicallyDefineDataIdentifier
+
+No CAN specific requirements
+
+WriteDataByIdentifier
+
+No CAN specific requirements
+
+WriteMemoryByAddress
+
+No CAN specific requirements
+
+ReadDTCInformation
+
+ClearDiagnosticInformation
+
+No CAN specific requirements
+Data Transmission Functional Unit
+No CAN specific requirements
+
+ReadDTCInformation
+
+No CAN specific requirements
+
+ClearDiagnosticInformation
+
+No CAN specific requirements
+
+4 
+
+—
+
+—
+
+—
+
+—
+
+—
+
+—
+
+—
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+ISO 14229-3:2012(E)
+
+Table 2 (continued)
+
+Input/Output Control Functional Unit
+
+InputOutputControlByIdentifier
+
+Remote Activation Of Routine Functional Unit
+No CAN specific requirements
+
+RoutineControl
+
+Upload/Download Functional Unit
+No CAN specific requirements
+
+RequestDownload
+
+RequestUpload
+
+TransferData
+
+RequestTransferExit
+
+No CAN specific requirements
+
+No CAN specific requirements
+
+No CAN specific requirements
+
+No CAN specific requirements
+
+RequestFileTransfer
+6.3  ResponseOnEvent (0x86) service DoCAN implementation requirements
+
+No CAN specific requirements
+
+—
+
+—
+
+—
+
+—
+
+—
+
+—
+
+—
+
+In addition to the generic implementation requirements stated in ISO 14229-1 the following additional 
+CAN specific implementation requirements shall apply.
+
+While  the  ResponseOnEvent  service  is  active,  the  server  shall  be  able  to  process  concurrent 
+diagnostic  request  and  response  messages  accordingly.  This  should  be  accomplished  with  a  different 
+serviceToRespondTo CAN Identifiers. If the same diagnostic request/response CAN Identifiers are used for 
+diagnostic communication and the serviceToRespondTo-responses, the following restrictions shall apply:
+
+a)  The  server  may  ignore  an  incoming  diagnostic  request  issued  by  the  client  that  initiated  the 
+event, after an event has occurred and the serviceToRespondTo-response is in progress, until the 
+serviceToRespondTo-response is completed. If another client issued the request, the server may or 
+may not ignore the request, depending on the server’s capabilities.
+
+b)  When  the  client  receives  any  response  after  sending  a  diagnostic  request,  the  response  shall  be 
+classified  according  to  the  possible  serviceToRespondTo-responses  and  the  expected  diagnostic 
+responses to the previously sent request.
+
+1) 
+
+2) 
+
+If the response is a serviceToRespondTo-response (one of the possible responses set up with 
+ResponseOnEvent-service),  the  client  shall  repeat  the  request  after  the  serviceToRespondTo-
+response has been received completely.
+
+If the response is ambiguous (i.e. the response could originate from the serviceToRespondTo 
+initiated  by  an  event  or  from  the  response  to  a  diagnostic  request),  the  client  shall  present 
+the  response  both  as  a  serviceToRespondTo-response  and  as  the  response  to  the  diagnostic 
+request. The client shall not repeat the request with the exception of NegativeResponseCode 
+busyRepeatRequest (0x21) (see the negative response code definitions in ISO 14229-1.
+
+© ISO 2012 – All rights reserved 
+
+5
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+client
+
+server
+
+SF-Diag-Request
+
+STRT-ResponseFF
+
+Event
+
+server ignores request
+
+STRT-FC
+
+SF-Diag-Request
+
+STRT-CF
+
+STRT-CF
+
+the STRT-response is completed 
+and the tester repeats the 
+diagnostic request, if the
+response is a valid STRT-
+response.
+
+server responds to request
+
+Response
+
+Figure 2 — Concurrent request when the event occurs
+
+c)  When the specified event is detected, the server shall respond immediately with the appropriate 
+serviceToRespondTo-response  message.  The  immediate  serviceToRespondTo-response  message 
+shall not disrupt any other diagnostic request or response transmission already in progress (i.e. the 
+serviceToRespondTo-response  shall  be  delayed  until  the  current  message  transmission  has  been 
+completed, see Figure 3).
+
+server
+
+client
+
+SF Diag-Request
+
+FC
+
+FC
+
+Diag-Resp. FF
+
+Event
+
+STRT-Response
+is delayed
+
+STRT-Resp. FF
+
+Diag.- Response is
+completed
+and the server sends the 
+STRT-response.
+
+STRT-CF
+
+STRT-CF
+
+Figure 3 — Event occurrence during a message in progress
+
+6 
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+ISO 14229-3:2012(E)
+
+6.4  ReadDataByPeriodicIdentifier (0x2A) service
+
+6.4.1  Periodic transmission response message
+
+The ReadDataByPeriodicIdentifier service allows the client to request the periodic transmission of data record 
+values from the server identified by one or more periodicDataIdentifiers. For service 0x2A implementation 
+on DoCAN, the periodic transmission response message is supported according to ISO 14229-1.
+
+The usage of the periodic transmission response message should consider a single data format being 
+supported for the whole vehicle which may consist of other data links than CAN. E.g. if FlexRay is part 
+of the electrical vehicle architecture in addition to CAN, the total DID data length shall not exceed the 
+length limitations of the CAN protocol to ensure a single data format.
+
+Table 3 describes the periodic transmission response message.
+
+Table 3 — Periodic transmission — Requirements for response message mapping
+
+Message type
+
+Client request 
+requirements
+
+Server response 
+requirements
+
+Further server restrictions
+
+UUDT uses a 
+different CAN 
+Identifier for 
+periodic trans-
+mission
+
+No restrictions
+
+The request for periodic transmission is processed as 
+a regular diagnostic request and the response is sent 
+via the network layer (as a USDT message with service 
+identifier 0x6A).
+
+Only single-frame 
+responses for 
+periodic trans-
+mission 
+Multi-frame 
+responses to new 
+(non-periodic-
+transmission) 
+requests are pos-
+sible
+
+On receiving the N_USData.con that indicates the comple-
+tion of the transmission of the positive response, the 
+application starts an independent scheduler, which han-
+dles the periodic transmission.
+
+The scheduler in the server processes the periodic 
+transmission as a single CAN frame response message in 
+a bypass (i.e. writes the message directly to the CAN-con-
+troller/data link layer driver without using the network-
+layer).
+
+There is neither a protocol control information (PCI) nor 
+a service identifier (SId) included in the response mes-
+sage. Only the periodic identifier and corresponding data 
+are included.
+6.4.2  Periodic transmission response message handling
+
+6.4.2.1  General
+
+Due to the fact, that the periodic response message neither supports protocol control information nor 
+the service identifier information (transport layer by-pass), the following service primitives need to be 
+taken into account. The service primitives as defined below make use of the individual parameters as 
+specified in ISO 15765-2:
+6.4.2.2  N_UUData.request
+
+The service primitive requests periodic transmission of < MessageData > with < Length > number of 
+bytes from the sender to the receiver peer entities identified by the address information in N_SA and 
+N_TA. Each time the N_UUData.request service is called, the transport/network layer shall signal the 
+completion  (or  failure)  of  the  message  transmission  to  the  service  user  by  means  of  the  issuing  of  a 
+N_UUData.confirm service call:
+
+© ISO 2012 – All rights reserved 
+
+7
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+N_UUData.request
+
+6.4.2.3  N_UUData.confirm
+
+( 
+N_SA, 
+N_TA, 
+<Length>, 
+<MessageData> 
+)
+
+The N_UUData.confirm service is issued by the transport/network layer. The service primitive confirms 
+the completion of a N_UUData.request service identified by the address information in N_SA and N_TA. 
+The parameter < N_Result > provides the status of the service request (referring < N_Result > values 
+defined in ISO 15765-2.
+
+N_UUData.confirm
+
+( 
+N_SA, 
+N_TA, 
+<N_Result> 
+)
+
+NOTE 
+6.4.2.4  N_UUData.indication
+
+Not all result values as defined in ISO 15765-2 apply for the response message transmission type UUDT.
+
+The  N_UUData.indication  service  is  issued  by  the  transport/network  layer.  The  service  primitive 
+delivers < MessageData > with < Length > bytes received from a peer protocol entity identified by the 
+address information in N_SA and N_TA to the upper layer (see definition in ISO 15765-2.
+
+The parameters < MessageData > and < Length > are only valid when the service primitive is indicated. In 
+case of a reception error no indication will be generated. Therefore a < N_Result > parameter is not needed.
+
+N_UUData.indication
+
+( 
+N_SA, 
+N_TA, 
+<Length>, 
+<MessageData> 
+)
+
+6.4.3  DoCAN frame format
+
+6.4.3.1  General
+
+Since  the  periodic  transmission  response  message  neither  supports  PCI  information  nor  service 
+identification information the protocol data unit format (PDU) differs to what is defined in ISO 15765-2. 
+However, the CAN periodic transmission PDU format consists of three fields, as specified in Table 4.
+Table 4 — Periodic transmission — PDU format
+
+Address information
+
+Length information
+
+Data field
+
+CAN Identifier C_AI
+
+DLC
+
+<MessageData>
+
+8 
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+6.4.3.2  Address information
+
+The C_AI is used to identify the communicating peer entities for the periodic message PDUs. The exchange 
+of network layer data are supported by normal addressing. The address information is mapped onto the 
+CAN Identifier see ISO 15765-2.
+6.4.3.3  Length Information
+
+The DLC parameter specifies the number of data bytes transmitted in a CAN frame.
+6.4.3.4  Data Field
+
+The < MessageData > field contains periodic data information defined with a periodicDataIdentifier (PDID) 
+and its corresponding dataRecords. The maximum size of the < MessageData > field shall be eight bytes.
+6.4.4  Periodic transmission message flow
+
+Figure 4 graphically illustrates the periodic response messages handling as specified above. As already 
+stated in 6.4.2, the figure shows that the periodically transmitted response messages do not have any 
+influence on the S3Server timer of the server. For this figure it is assumed that a non-defaultSession has 
+been activated prior to the configuration of the periodic scheduler (the ReadDataByPeriodicIdentifier 
+service requires a non-defaultSession in order to be executed).
+
+© ISO 2012 – All rights reserved 
+
+9
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+Client
+T_Data
+
+.req
+
+.con
+
+.ind
+
+.req
+
+.con
+
+SOM .ind
+
+.req
+
+.con
+
+.ind
+
+.req
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+14
+
+15
+
+16
+
+17
+
+18
+
+19
+
+20
+
+21
+
+22
+
+23
+
+24
+
+25
+
+26
+
+27
+
+28
+
+29
+
+30
+
+.con
+
+time
+
+10 
+
+Start
+
+Restart
+
+Start
+
+Stop
+
+S3Client
+
+PClient
+
+    Client
+N_UUData
+
+   Server
+N_UUData
+
+P2server
+
+S3server
+
+Server
+T_Data
+
+P2Client
+
+P2
+
+Client
+
+S3 Client
+
+A
+6
+x
+0
+
+e
+c
+i
+v
+r
+e
+s
+
+e
+s
+n
+o
+p
+s
+e
+r
+
+A
+2
+x
+0
+
+e
+c
+i
+v
+r
+e
+s
+
+t
+s
+e
+u
+q
+e
+r
+
+t
+s
+e
+u
+q
+e
+r
+
+e
+s
+n
+o
+p
+s
+e
+r
+
+l
+a
+n
+o
+i
+t
+c
+n
+u
+f
+
+P
+T
+
+P2Server
+
+P2
+
+Server
+
+.req
+
+.con
+.req
+
+.con
+.req
+
+.con
+
+.req
+
+.con
+
+.req
+
+.con
+
+.req
+
+.con
+
+.req
+
+.con
+.req
+
+.con
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+.
+
+p
+s
+e
+r
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+.
+
+p
+s
+e
+r
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+.
+
+p
+s
+e
+r
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+.
+
+p
+s
+e
+r
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+.
+
+p
+s
+e
+r
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+.
+
+p
+s
+e
+r
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+c
+i
+d
+o
+i
+r
+e
+p
+
+.
+
+p
+s
+e
+r
+
+.
+
+p
+s
+e
+r
+
+.ind
+
+.ind
+
+.ind
+
+.ind
+
+.ind
+
+.ind
+
+.ind
+
+.ind
+
+S3
+
+Client
+
+l
+a
+n
+o
+i
+t
+c
+n
+u
+f
+
+P
+T
+
+.ind
+
+.req
+
+.ind
+
+S3Server
+
+SOM .ind
+
+.ind
+
+.req
+
+.ind
+
+S3
+
+Server
+
+.con
+
+S3
+Server
+reload
+
+.ind
+
+time
+
+any 
+TesterPresent
+that is 
+received 
+during a 
+disabled S3
+server timer 
+will be 
+ignored by the 
+server
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ISO 14229-3:2012(E)
+
+Key
+
+1
+
+Client T_Data.req:
+
+2
+
+3
+
+4
+
+ The diagnostic application of the client starts the transmission of the ReadDataBy-
+PeriodicIdentifier (0x2A) request message by issuing a T_Data.req to its transport/network layer. The 
+transport/network layer transmits the ReadDataByPeriodicIdentifier (0x2A) request message to the 
+server. The request message can either be a segmented or unsegmented message (depends on the number 
+of periodicDataIdentifier contained in the request message). For the example given, it is assumed that the 
+Client T_Data.con:
+request message fits into a single frame
+
+Server T_Data.ind:
+the response timing as described in ISO 14229-2 applies
+
+ The completion of the request message is indicated in the client via T_Data.con. Now 
+
+ The completion of the request message is indicated in the server via the T_Data.ind. 
+Now the response timing as described in ISO 14229-2 applies. Furthermore, the server stops its S3Server 
+Server T_Data.req:
+timer
+
+ It is assumed that the client requires a response from the server. The server shall 
+transmit the ReadDataByPeriodicIdentifier positive response message to indicate that the request has 
+Server T_Data.con:
+been processed
+
+ The completion of the transmission of the ReadDataByPeriodicIdentifier response 
+
+message is indicated in the server via T_Data.con. Now the server restarts its S3Server timer, which keeps 
+the activated non-default session active as long as it does not time out. The transmission of the periodic 
+Client T_Data.ind:
+messages will now be started
+
+5
+
+Server N_UUData.req:
+
+ The reception of the response message is indicated in the client
+
+6
+
+7
+
+8
+
+9
+
+10
+
+11
+
+12
+
+13
+
+ The server starts to transmit the periodic response messages (single DoCAN 
+frame messages). Each periodic message which neither includes any PCI information nor service iden-
+tification uses a different source address than USDT response messages. Therefore, the server issues 
+a N_UUData.req each time a periodic message is transmitted independent of any other service currently 
+processed by the server. This means that the transmission of the periodic response messages continues 
+even when the server is in the process of handling another diagnostic service request. The transmission 
+of the periodic response messages has no influence on the S3Server timer
+Server N_UUData.con:
+
+Client N_UUData.ind:
+in the server
+
+ The completion of the transmission of the periodic response message is indicated 
+
+ The completion of the reception of the periodic response message is indicated in 
+
+the client
+
+See (5)
+
+See (6)
+
+See (5)
+
+Client T_Data.req:
+See (6)
+
+ The diagnostic application of the client starts the transmission of the next request 
+
+message by issuing a T_Data.req to its transport/network layer. The transport/network layer transmits 
+the request message to the server. The request message can either be an unsegmented or segmented mes-
+Server T_Data_SOM.ind:
+sage. For the example given, it is assumed that the request message is a multi-frame message
+
+ The start of a request message is indicated in the server via T_Data_SOM.ind 
+while a periodic scheduler is active. The server does not stop the periodic scheduler for the duration of 
+processing the received request message. This means that the server transmits further periodic messages 
+for the duration of processing the diagnostic service. The client shall be aware of receiving these periodic 
+response messages. Furthermore, any time the server is in the process of handling any diagnostic service 
+it stops its S3Server timer
+Client T_Data.con:
+
+the response timing as described in ISO 14229-2 applies
+
+ The completion of the request message is indicated in the client via T_Data.con. Now 
+
+11
+
+© ISO 2012 – All rights reserved 
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+ 
+ 
+ISO 14229-3:2012(E)
+
+Server T_Data.ind:
+
+14
+
+15
+
+16
+
+17
+
+18
+
+19
+
+20
+
+21
+
+22
+
+23
+
+24
+
+25
+
+26
+
+27
+
+28
+
+29
+
+30
+
+12 
+
+T_Data.ind. Now the response timing as described in ISO 14229-2 applies
+
+ The completion of the multi-frame request message is indicated in the server via the 
+
+See (5)
+
+Server T_Data.req:
+See (6)
+
+ It is assumed that the client requires a response from the server. The server shall 
+
+transmit the positive (or negative) response message via issuing a T_Data.req to its transport/network 
+layer. In this example it is assumed that the response is a multi-frame message. While the multi-frame 
+response message is transmitted by the transport/network layer, the periodic scheduler continues to 
+Client T_Data_SOM.ind:
+transmit the periodic response messages
+
+ The start of the response message is indicated in the client
+
+See (5)
+
+Client T_Data.req:
+See (6)
+
+addressed TesterPresent (0x3E) request message to restart the S3Server timer in the server
+Server T_Data.ind:
+
+ When the S3Client timer times out in the client, then the client transmits a functionally 
+
+ The server is in the process of transmitting the multi-frame response message of the 
+
+previous request. Therefore, the server shall not act on the received TesterPresent (0x3E) request mes-
+sage, because its S3Server timer is not yet re-activated
+Client T_Data.con:
+
+ The reception of the TesterPresent (0x3E) request message is indicated in the client
+
+See (5)
+
+Server T_Data.con:
+See (6)
+
+ When the diagnostic service is completely processed, then the server restarts its 
+
+S3Server timer. This means that any diagnostic service, including TesterPresent (0x3E), restarts the 
+S3Server timer. A diagnostic service is meant to be in progress any time between the start of the reception 
+of the request message (T_Data_SOM.ind or T_Data.ind receive) and the completion of the transmission 
+of the response message, where a response message is required or the completion of any action that is 
+caused by the request, where no response message is required (point in time reached that would cause 
+the start of the response message). This includes negative response messages including response code 
+Client T_Data.ind:
+0x78
+
+ The reception of the response message is indicated in the client
+
+See (5)
+
+See (6)
+
+See (5)
+
+Client T_Data.req:
+See (6)
+
+ When the S3Client timer times out in the client (non-defaultSession active), then the 
+
+client transmits a functionally addressed TesterPresent (0x3E) request message which does not require a 
+response message, each time the S3Client timer times out
+Client T_Data.con:
+
+ Upon the indication of the completed transmission of the TesterPresent (0x3E) 
+
+request message via T_Data.con of its transport/network layer, the client once again starts its S3Client 
+timer. This means that the functionally addressed TesterPresent (0x3E) request message is sent on a peri-
+odic basis every time S3Client times out
+Server T_Data.ind:
+
+ The reception of the TesterPresent (0x3E) request message is indicated in the server. 
+
+The server shall re-activate the S3Server timer
+
+Figure 4 — Periodic transmission response message handling
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+ 
+ 
+ 
+ISO 14229-3:2012(E)
+
+7  Application layer requirements
+
+7.1  Application layer services
+
+This part of ISO 14229 uses the application layer services as defined in ISO 14229-1 for client-server 
+based systems to perform functions such as test, inspection, monitoring, diagnosis or programming of 
+on-board vehicle servers.
+7.2  Application layer protocol
+
+This part of ISO 14229 uses the application layer protocol as defined in ISO 14229-1.
+7.3  Application layer timing
+
+7.3.1  General
+
+The subclauses specify the message timing parameters and how they apply to the client and the server.
+7.3.2  Message timing parameter values
+
+The application layer timing parameter values shall be in accordance with the definitions in ISO 14229-2.
+7.3.3  Unsolicited response messages
+
+Unsolicited messages are those transmitted by the server(s) based on either a periodic scheduler (see 
+service ReadDataByPeriodicIdentifier in 6.4) or a configured trigger, such as a change of a DTC status or 
+a dataIdentifier value change (see service ResponseOnEvent in 6.3).
+
+Any  unsolicited  transmitted  response  message  shall  not  reset  the  S3Server  timer  in  the  server.  This 
+avoids a diagnostic session keep-alive latch-up effect in the server for cases where a periodic message 
+transmission  is active  or  a  timer-triggered event is configured in the server where the time interval 
+between the events is smaller than  S3Server. The S3Server timer shall only be reset if the transmitted 
+response  message  is  the  direct  result  of  processing  a  request  message  and  transmitting  the  final 
+response message (such as the initial positive response that indicates that a request to schedule one or 
+more periodicDataIdentifiers is performed successfully).
+8  Presentation layer requirements
+
+The presentation layer requirements are in the responsibility of the vehicle manufacturer.
+9  Session layer requirements
+
+The session layer requirements are specified in ISO 14229-2.
+10  Transport/Network layer interface adaptation
+
+10.1  General information
+
+This part of ISO 14229 makes use of the network layer services defined in ISO 14229-2 for the transmission 
+and reception of diagnostic messages. This subclause defines the mapping of the data link independent 
+transport/network  layer  protocol  data  units  (T_PDU)  onto  the  CAN  data  link  specific  network  layer 
+protocol data units (N_PDU).
+
+NOTE 
+management timing.
+
+The transport/network layer services are used to perform the application layer and diagnostic session 
+
+13
+
+© ISO 2012 – All rights reserved 
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+10.2  DoCAN Transport/Network layer interface adaptation
+
+10.2.1  Mapping of data link independent service primitives onto CAN data link dependent ser-
+vice primitives
+
+Table 5 specifies the mapping interface between ISO 15765-2, DoCAN transport protocol and network 
+layer services and the session layer services defined in ISO 14229-2 for the transmission and reception 
+of diagnostic messages.
+Table 5 — Mapping of T_PDU service primitives onto N_PDU service primitives
+
+Session to transport layer service primitives
+
+DoCAN network layer service primitives
+
+(data link independent according to ISO 14229-2)
+
+(data link dependent according to ISO 15765-2)
+
+T_Data.indication
+
+T_DataSOM.indication
+
+T_Data.confirm
+
+N_USData.indication
+
+N_USDataFF.indication
+
+N_USData.confirm
+
+N_USData.request
+
+10.2.2  Mapping of T_PDU onto N_PDU for message transmission
+
+T_Data.request
+
+The  parameters  of  the  application  layer  protocol  data  unit  defined  to  request  the  transmission  of  a 
+diagnostic service request/response are mapped in accordance with Table 6 onto the parameters of the 
+transport/network layer protocol data unit for the transmission of a message in the client/server.
+Table 6 — Mapping of T_PDU parameter onto N_PDU parameter
+
+T_PDU parameter
+
+N_PDU parameter
+
+(data link independent according to ISO 14229-2)
+
+(CAN data link dependent according to ISO 15765-2)
+
+T_Mtype
+
+T_SA
+
+T_TA
+
+T_TAtype
+
+T_AE
+
+  Mtype = diagnostics, then the address information 
+shall consist of the parameters SA, TA, and TAtype.
+
+   If Mtype = remote diagnostics, then the address 
+information shall consist of the parameters SA, TA, 
+TAtype, and AE.
+
+T_Data [ ]
+
+T_Length
+
+T_Result
+
+N_Mtype
+
+N_SA
+
+N_TA
+
+N_TAtype
+
+N_AE
+
+<MessageData>
+
+<Length>
+
+<N_Result>
+
+The  network  layer  confirmation  of  the  successful  transmission  of  the  message  (N_USData.con)  is 
+forwarded to the application, because it is needed in the application for starting those actions, which 
+shall  be  executed  immediately  after  the  transmission  of  the  request/response  message  (ECUReset, 
+BaudrateChange, etc.).
+
+The address mapping between the network layer and the OSI higher layers is not necessarily an exact copy of 
+the address values as encoded on the data link layer and therefore depends on the implementation concept.
+
+The mapping is defined in ISO 15765-2. Values for emissions-related OBD are defined in ISO 15765-4.
+
+14 
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ 
+  
+  
+ 
+ISO 14229-3:2012(E)
+
+11  Data link layer diagnostic implementation requirements
+
+11.1  Usage of legislated 11-bit OBD CAN Identifiers for enhanced diagnostics
+
+The  11-bit  CAN  Identifiers  for  legislated  OBD  can  also  be  used  for  enhanced  diagnostics  (e.g.  the 
+functional  request  CAN  Identifier  can  be  used  for  the  functionally  addressed  TesterPresent  (0x3E) 
+request message to keep a non-defaultSession active).
+
+If  the  11-bit  CAN  identifiers  are  used  for  enhanced  diagnostics  as  specified  in  ISO  15765-4,  then  the 
+following requirements apply:
+
+a) 
+
+the network layer timing parameters according ISO 15765-4 shall also apply for enhanced diagnostics;
+
+b) 
+11.2  Usage of legislated 29-bit OBD CAN Identifiers for enhanced diagnostics
+
+the DLC (CAN data length code) shall be set to eight and the CAN frame shall include eight bytes 
+(unused bytes shall be padded).
+
+The 29-bit CAN Identifiers for emissions-related legislated OBD servers comply with the normal fixed 
+addressing format specified in ISO 15765-2 and can also be used for enhanced diagnostics.
+
+If the 29-bit CAN identifiers as specified in ISO 15765-4 are re-used for enhanced diagnostics, then the 
+following requirements apply:
+
+a) 
+
+the  network  layer  timing  parameters  as  specified  in  ISO  15765-4  shall  also  apply  for  enhanced 
+diagnostics;
+
+b) 
+
+the DLC shall be set to eight and the CAN frame shall include eight bytes (unused bytes shall be padded).
+
+NOTE 
+
+The CAN Identifier values given in the ISO 15765-2 use the default value for the priority information.
+
+© ISO 2012 – All rights reserved 
+
+15
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+ISO 14229-3:2012(E)
+
+Bibliography
+
+Information  technology  —  Open  Systems  Interconnection  —  Basic  Reference 
+
+Model — The Basic Mode
+ISO/IEC  7498-1, 
+
+Information technology — Open Systems Interconnection — Basic Reference 
+
+Model — Conventions for the definition of OSI services
+ISO/IEC 10731:1994, 
+
+Road  vehicles  —  Controller  area  network  (CAN)  —  Part  1:  Data  link  layer  and 
+
+physical signalling
+ISO  11898-1, 
+
+Road vehicles — Controller area network (CAN) — Part 2: High-speed medium access unit
+
+  Road vehicles — Controller area network (CAN) — Part 3: Low-speed, fault-tolerant, 
+
+ISO 11898-2, 
+medium dependent interface
+ISO 11898-3,
+
+  Road vehicles — Controller area network (CAN) — Part 5: High-speed medium access 
+
+unit with low-power mode
+ISO 11898-5,
+
+Road vehicles — Communication between test equipment and vehicles over 
+
+Internet Protocol
+ISO 13400 (all parts), 
+
+-DA,  Digital  Annex  of  Electrical/Electronic  Systems  Diagnostic  Terms,  Definitions, 
+
+Abbreviations, and Acronyms Web Tool Spreadsheet
+SAE  J1930
+
+Companion Spreadsheet (CS1939)
+
+Recommended Practice for a Serial Control and Communication Vehicle Network 
+
+SAE J1939, 
+— Application layer — Diagnostics
+SAE J1939-73:2010, 
+
+Digital Annex of E/E Diagnostic Test Modes
+
+SAE J1979-DA, 
+
+Digital Annex of Diagnostic Trouble Code Definitions and Failure Type Byte Definitions
+
+[1] 
+
+[2] 
+
+[3] 
+
+[4] 
+
+[5] 
+
+[6] 
+
+[7] 
+
+[8] 
+
+[9] 
+
+[10] 
+
+[11] 
+
+[12] 
+
+SAE J2012-DA, 
+
+16 
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`---ISO 14229-3:2012(E)
+
+ICS 43.180
+
+Price based on 16 pages
+
+© ISO 2012 – All rights reserved
+
+Copyright International Organization for Standardization Provided by IHS under license with ISO Not for ResaleNo reproduction or networking permitted without license from IHS--`,,```,,,,````-`-`,,`,,`,`,,`--- 
+ 
+
