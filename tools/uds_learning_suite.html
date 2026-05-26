@@ -2681,13 +2681,8 @@ function updateBuilder() {
   const sfVal = sfSelect.value;
   if (sfVal && sfVal !== 'none') reqBytes.push(parseInt(sfVal, 16));
 
-  const dataInput = document.getElementById('builder-data');
-  let dataStr = dataInput.value.trim();
-  if (dataStr) {
-    for (const p of dataStr.split(/[\s,]+/)) {
-      if (/^[0-9a-fA-F]{2}$/.test(p)) reqBytes.push(parseInt(p, 16));
-    }
-  }
+  var dataBytes = parseHexStr(document.getElementById('builder-data').value);
+  if (dataBytes.length) reqBytes.push(...dataBytes);
 
   // Request display (color-coded)
   const reqDisplay = document.getElementById('builder-request');
@@ -2707,6 +2702,16 @@ function updateBuilder() {
   document.getElementById('builder-response').innerHTML =
     `正响应: ${resBytes.map(b => `<span class="byte sid-byte">${b.toString(16).toUpperCase().padStart(2,'0')}</span>`).join(' ')}<br>` +
     `负响应: <span class="byte nrc">7F</span> <span class="byte nrc">${s.reqSID}</span> <span class="byte nrc">NRC</span>`;
+}
+
+// Hex string → byte array utility (shared by builder + simulator)
+function parseHexStr(str) {
+  var bytes = [];
+  if (!str) return bytes;
+  for (var p of str.trim().split(/[\s,]+/)) {
+    if (/^[0-9a-fA-F]{2}$/.test(p)) bytes.push(parseInt(p, 16));
+  }
+  return bytes;
 }
 
 // Init service browser and builder on page load
@@ -3072,14 +3077,14 @@ function nextQuiz() {
  *   bit6: testNotCompletedThisMonitoringCycle  bit7: warningIndicatorRequested
  */
 var DTC_STATUS_BITS = [
-  { bit: 0, label: 'TF', desc: 'testFailed' },
-  { bit: 1, label: 'TFT', desc: 'testFailedThisOpCycle' },
-  { bit: 2, label: 'PD', desc: 'pendingDTC' },
-  { bit: 3, label: 'CD', desc: 'confirmedDTC' },
-  { bit: 4, label: '!C', desc: 'testNotCompletedSinceClear' },
-  { bit: 5, label: '!F', desc: 'testFailedSinceClear' },
-  { bit: 6, label: '!M', desc: 'testNotCompletedThisOp' },
-  { bit: 7, label: 'WIR', desc: 'warningIndicator' }
+  { bit: 0, mask: 0x01, label: 'TF', name: 'testFailed', desc: 'testFailed' },
+  { bit: 1, mask: 0x02, label: 'TFT', name: 'testFailedThisOperationCycle', desc: 'testFailedThisOpCycle' },
+  { bit: 2, mask: 0x04, label: 'PD', name: 'pendingDTC', desc: 'pendingDTC' },
+  { bit: 3, mask: 0x08, label: 'CD', name: 'confirmedDTC', desc: 'confirmedDTC' },
+  { bit: 4, mask: 0x10, label: '!C', name: 'testNotCompletedSinceLastClear', desc: 'testNotCompletedSinceClear' },
+  { bit: 5, mask: 0x20, label: '!F', name: 'testFailedSinceLastClear', desc: 'testFailedSinceClear' },
+  { bit: 6, mask: 0x40, label: '!M', name: 'testNotCompletedThisOperationCycle', desc: 'testNotCompletedThisOp' },
+  { bit: 7, mask: 0x80, label: 'WIR', name: 'warningIndicatorRequested', desc: 'warningIndicator' }
 ];
 
 function renderDTCStatus() {
@@ -3350,13 +3355,8 @@ function updatePreview() {
   var sfVal = document.getElementById('composer-sf') ? document.getElementById('composer-sf').value : null;
   if (sfVal) reqBytes.push(parseInt(sfVal, 16));
 
-  var dataStr = document.getElementById('composer-data').value.trim();
-  if (dataStr) {
-    var parts = dataStr.split(/[\s,]+/);
-    for (var i = 0; i < parts.length; i++) {
-      if (/^[0-9a-fA-F]{2}$/.test(parts[i])) reqBytes.push(parseInt(parts[i], 16));
-    }
-  }
+  var dataBytes = parseHexStr(document.getElementById('composer-data').value);
+  if (dataBytes.length) reqBytes.push(...dataBytes);
 
   // Request preview
   var preq = document.getElementById('preview-req');
@@ -3628,13 +3628,8 @@ function sendMessage() {
   var sfVal = document.getElementById('composer-sf') ? document.getElementById('composer-sf').value : null;
   if (sfVal) reqBytes.push(parseInt(sfVal, 16));
 
-  var dataStr = document.getElementById('composer-data').value.trim();
-  if (dataStr) {
-    var parts = dataStr.split(/[\s,]+/);
-    for (var i = 0; i < parts.length; i++) {
-      if (/^[0-9a-fA-F]{2}$/.test(parts[i])) reqBytes.push(parseInt(parts[i], 16));
-    }
-  }
+  var dataBytes = parseHexStr(document.getElementById('composer-data').value);
+  if (dataBytes.length) reqBytes.push(...dataBytes);
 
   doSend(reqBytes);
 }
@@ -4089,13 +4084,7 @@ function doSend(reqBytes) {
 
 // ── Raw HEX ────────────────────────────────────────────────────────────
 function sendRawHex() {
-  var raw = document.getElementById('hex-raw').value.trim();
-  if (!raw) return;
-  var bytes = [];
-  var parts = raw.split(/[\s,]+/);
-  for (var i = 0; i < parts.length; i++) {
-    if (/^[0-9a-fA-F]{2}$/.test(parts[i])) bytes.push(parseInt(parts[i], 16));
-  }
+  var bytes = parseHexStr(document.getElementById('hex-raw').value);
   if (bytes.length === 0) {
     showToast('无效的 HEX 输入', 'error');
     return;
@@ -4104,13 +4093,8 @@ function sendRawHex() {
 }
 
 function onRawHex() {
-  var raw = document.getElementById('hex-raw').value.trim();
-  if (!raw) return;
-  var bytes = [];
-  var parts = raw.split(/[\s,]+/);
-  for (var i = 0; i < parts.length; i++) {
-    if (/^[0-9a-fA-F]{2}$/.test(parts[i])) bytes.push(parseInt(parts[i], 16));
-  }
+  var bytes = parseHexStr(document.getElementById('hex-raw').value);
+  if (bytes.length === 0) return;
   if (bytes.length > 0) {
     var sid = bytes[0];
     var info = SID_INFO[sid];
@@ -4145,6 +4129,27 @@ function resetECU() {
 // ════════════════════════════════════════════════════════════════════════
 // Scenarios — runScenario, waitSend, toggleAutoTP
 // ════════════════════════════════════════════════════════════════════════
+
+function scenarioSequence(steps) {
+  var i = 0;
+  function next() {
+    if (i < steps.length) {
+      var step = steps[i++];
+      if (typeof step === 'number') {
+        setTimeout(next, step);
+      } else if (Array.isArray(step)) {
+        doSend(step);
+        var delay = (i < steps.length && typeof steps[i] === 'number') ? steps[i++] : 300;
+        setTimeout(next, delay);
+      } else if (typeof step === 'string') {
+        addLogEntry([], step, 'req');
+        var delay = (i < steps.length && typeof steps[i] === 'number') ? steps[i++] : 100;
+        setTimeout(next, delay);
+      }
+    }
+  }
+  next();
+}
 
 function runScenario(name) {
   switch (name) {
@@ -4181,56 +4186,38 @@ function runScenario(name) {
       break;
     case 'ecu-reset': doSend([0x11, 0x01]); break;
     case 'full-diag-flow':
-      addLogEntry([], '=== 📋 完整诊断流程演示 ===', 'res');
-      addLogEntry([], 'Step 1: 进入扩展会话...', 'req');
-      doSend([0x10, 0x03]);
-      setTimeout(function() {
-        addLogEntry([], 'Step 2: SecurityAccess 请求种子...', 'req');
-        doSend([0x27, 0x01]);
-        setTimeout(function() {
-          addLogEntry([], 'Step 3: 发送密钥解锁...', 'req');
-          doSend([0x27, 0x02, 0x12, 0x34, 0x56, 0x78]);
-          setTimeout(function() {
-            addLogEntry([], 'Step 4: 读取 VIN (DID F190)...', 'req');
-            doSend([0x22, 0xF1, 0x90]);
-            setTimeout(function() {
-              addLogEntry([], 'Step 5: 读取 DTC 状态...', 'req');
-              doSend([0x19, 0x02, 0xFF]);
-              setTimeout(function() {
-                addLogEntry([], 'Step 6: 清除 DTC...', 'req');
-                doSend([0x14, 0xFF, 0xFF, 0xFF]);
-                setTimeout(function() {
-                  addLogEntry([], 'Step 7: TesterPresent 保持会话...', 'req');
-                  doSend([0x3E, 0x00]);
-                  setTimeout(function() {
-                    addLogEntry([], '=== ✅ 诊断流程完成 ===', 'res');
-                  }, 300);
-                }, 300);
-              }, 300);
-            }, 300);
-          }, 300);
-        }, 500);
-      }, 400);
+      scenarioSequence([
+        '=== \u{1F4CB} 完整诊断流程演示 ===',
+        [0x10, 0x03], 400,
+        'Step 2: SecurityAccess 请求种子...',
+        [0x27, 0x01], 500,
+        'Step 3: 发送密钥解锁...',
+        [0x27, 0x02, 0x12, 0x34, 0x56, 0x78], 300,
+        'Step 4: 读取 VIN (DID F190)...',
+        [0x22, 0xF1, 0x90], 300,
+        'Step 5: 读取 DTC 状态...',
+        [0x19, 0x02, 0xFF], 300,
+        'Step 6: 清除 DTC...',
+        [0x14, 0xFF, 0xFF, 0xFF], 300,
+        'Step 7: TesterPresent 保持会话...',
+        [0x3E, 0x00], 300,
+        '=== \u2705 诊断流程完成 ==='
+      ]);
       break;
     case 'download-flow':
-      addLogEntry([], '=== 📥 下载流程演示 ===', 'res');
-      addLogEntry([], 'Step 1: 进入编程会话...', 'req');
-      doSend([0x10, 0x02]);
-      setTimeout(function() {
-        addLogEntry([], 'Step 2: RequestDownload...', 'req');
-        doSend([0x34, 0x00, 0x44, 0x00, 0x80, 0x00, 0x10, 0x00]);
-        setTimeout(function() {
-          addLogEntry([], 'Step 3-6: TransferData x4...', 'req');
-          doSend([0x36, 0x01, 0xAA, 0xBB, 0xCC, 0xDD]);
-          setTimeout(function() { doSend([0x36, 0x02, 0x11, 0x22, 0x33, 0x44]); }, 200);
-          setTimeout(function() { doSend([0x36, 0x03, 0x55, 0x66, 0x77, 0x88]); }, 400);
-          setTimeout(function() { doSend([0x36, 0x04, 0x99, 0xAA, 0xBB, 0xCC]); }, 600);
-          setTimeout(function() {
-            addLogEntry([], 'Step 7: RequestTransferExit...', 'req');
-            doSend([0x37, 0x00, 0x00, 0x00, 0x64]);
-          }, 800);
-        }, 400);
-      }, 400);
+      scenarioSequence([
+        '=== 📥 下载流程演示 ===',
+        [0x10, 0x02], 400,
+        'Step 2: RequestDownload...',
+        [0x34, 0x00, 0x44, 0x00, 0x80, 0x00, 0x10, 0x00], 400,
+        'Step 3-6: TransferData x4...',
+        [0x36, 0x01, 0xAA, 0xBB, 0xCC, 0xDD], 200,
+        [0x36, 0x02, 0x11, 0x22, 0x33, 0x44], 200,
+        [0x36, 0x03, 0x55, 0x66, 0x77, 0x88], 200,
+        [0x36, 0x04, 0x99, 0xAA, 0xBB, 0xCC], 200,
+        'Step 7: RequestTransferExit...',
+        [0x37, 0x00, 0x00, 0x00, 0x64]
+      ]);
       break;
   }
 }
@@ -4263,17 +4250,6 @@ function showToast(msg, type) {
 // DTC Status Byte — Interactive Bit Visualization (Task 15)
 // ════════════════════════════════════════════════════════════════════════
 
-const DTC_BITS = [
-  { bit: 0, mask: 0x01, name: 'testFailed', desc: '当前测试失败' },
-  { bit: 1, mask: 0x02, name: 'testFailedThisOperationCycle', desc: '本操作循环中测试失败' },
-  { bit: 2, mask: 0x04, name: 'pendingDTC', desc: '待定 DTC' },
-  { bit: 3, mask: 0x08, name: 'confirmedDTC', desc: '已确认 DTC' },
-  { bit: 4, mask: 0x10, name: 'testNotCompletedSinceLastClear', desc: '自上次清除后测试未完成' },
-  { bit: 5, mask: 0x20, name: 'testFailedSinceLastClear', desc: '自上次清除后测试失败' },
-  { bit: 6, mask: 0x40, name: 'testNotCompletedThisOperationCycle', desc: '本操作循环中测试未完成' },
-  { bit: 7, mask: 0x80, name: 'warningIndicatorRequested', desc: '警告指示灯请求' }
-];
-
 function updateDTCBits() {
   var val = 0;
   for (var i = 0; i < 8; i++) {
@@ -4293,8 +4269,8 @@ function updateDTCBits() {
 
 function getActiveBits(status) {
   var bits = [];
-  for (var i = 0; i < DTC_BITS.length; i++) {
-    if (status & DTC_BITS[i].mask) bits.push(DTC_BITS[i]);
+  for (var i = 0; i < DTC_STATUS_BITS.length; i++) {
+    if (status & DTC_STATUS_BITS[i].mask) bits.push(DTC_STATUS_BITS[i]);
   }
   return bits;
 }
@@ -4309,10 +4285,10 @@ function renderDTCExamples() {
   for (var i = 0; i < examples.length; i++) {
     var ex = examples[i];
     var chipsHtml = '';
-    for (var j = 0; j < DTC_BITS.length; j++) {
-      var isSet = !!(ex.hex & DTC_BITS[j].mask);
+    for (var j = 0; j < DTC_STATUS_BITS.length; j++) {
+      var isSet = !!(ex.hex & DTC_STATUS_BITS[j].mask);
       chipsHtml += '<span class="dtc-bit-chip ' + (isSet ? 'set' : 'clear') + '">' +
-        (isSet ? '✓ ' : '') + DTC_BITS[j].name + '</span> ';
+        (isSet ? '✓ ' : '') + DTC_STATUS_BITS[j].name + '</span> ';
     }
     html += '<div class="dtc-example-card" onclick="applyDTCBits(' + ex.hex + ')" title="点击应用此状态">'
       + '<div class="hex">0x' + ex.hex.toString(16).toUpperCase().padStart(2, '0') + ' — ' + ex.label + '</div>'
@@ -4337,10 +4313,10 @@ function renderSimDTCs() {
   for (var i = 0; i < dtcs.length; i++) {
     var dtc = dtcs[i];
     var chipsHtml = '';
-    for (var j = 0; j < DTC_BITS.length; j++) {
-      var isSet = !!(dtc.status & DTC_BITS[j].mask);
+    for (var j = 0; j < DTC_STATUS_BITS.length; j++) {
+      var isSet = !!(dtc.status & DTC_STATUS_BITS[j].mask);
       chipsHtml += '<span class="dtc-bit-chip ' + (isSet ? 'set' : 'clear') + '">' +
-        (isSet ? '✓ ' : '') + DTC_BITS[j].name + '</span> ';
+        (isSet ? '✓ ' : '') + DTC_STATUS_BITS[j].name + '</span> ';
     }
     html += '<div class="dtc-sim-card">'
       + '<div class="dtc-code">' + dtc.id + '</div>'
