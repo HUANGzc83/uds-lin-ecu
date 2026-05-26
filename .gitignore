@@ -65,3 +65,4 @@ doc/*.pdf
 # Windows
 Thumbs.db
 Desktop.ini
+.codegraph/
