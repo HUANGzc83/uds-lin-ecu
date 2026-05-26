@@ -1,6 +1,6 @@
 # UDS over LIN — ECU 诊断协议栈
 
-[🌐 English](README_EN.md)
+[![English](https://img.shields.io/badge/English-README_EN-blue)](README_EN.md)
 
 [![ISO 14229-1](https://img.shields.io/badge/ISO--14229--1:2020-blue)](doc/)
 [![Language](https://img.shields.io/badge/C-C11-green)]()

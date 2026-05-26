@@ -1,6 +1,6 @@
 # UDS over LIN — Diagnostic Stack
 
-[🌐 中文](README.md)
+[![中文](https://img.shields.io/badge/中文-README-blue)](README.md)
 
 [![ISO 14229-1](https://img.shields.io/badge/ISO--14229--1:2020-blue)](doc/)
 [![Language](https://img.shields.io/badge/C-C11-green)]()
