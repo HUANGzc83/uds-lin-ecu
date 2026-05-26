@@ -154,16 +154,23 @@ static void check_pos_rsp(const uds_response_t *rsp,
 
 /**
  * @brief Assert that a response is a negative response with expected NRC.
+ *
+ * Checks the uds_set_neg_rsp output layout:
+ *   rsp->sid = 0x7F
+ *   rsp->subfunc_echo = expected_subfunc
+ *   rsp->data = {expected_sid, expected_nrc}  (2 bytes)
  */
 static void check_neg_rsp(const uds_response_t *rsp,
-                          uint8_t expected_req_sid,
-                          uint8_t expected_nrc)
+                          uint8_t expected_sid,
+                          uint8_t expected_nrc,
+                          uint8_t expected_subfunc)
 {
-    TEST_ASSERT_EQUAL_UINT8(0x7F,                 rsp->sid);
-    TEST_ASSERT_EQUAL_UINT8(expected_req_sid,     rsp->subfunc_echo);
+    TEST_ASSERT_EQUAL_UINT8(0x7F,               rsp->sid);
+    TEST_ASSERT_EQUAL_UINT8(expected_subfunc,   rsp->subfunc_echo);
     TEST_ASSERT_NOT_NULL(rsp->data);
-    TEST_ASSERT_EQUAL_UINT8(1,                    rsp->data_len);
-    TEST_ASSERT_EQUAL_UINT8(expected_nrc,         rsp->data[0]);
+    TEST_ASSERT_EQUAL_UINT8(2,                  rsp->data_len);
+    TEST_ASSERT_EQUAL_UINT8(expected_sid,       rsp->data[0]);
+    TEST_ASSERT_EQUAL_UINT8(expected_nrc,       rsp->data[1]);
 }
 
 /**
@@ -351,7 +358,7 @@ void test_start_routine_already_running_returns_nrc22(void)
     bool result = call_handler(raw, len, &rsp2, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp2, ROUTINE_CONTROL, NRC_CONDITIONS_NOT_CORRECT);
+    check_neg_rsp(&rsp2, ROUTINE_CONTROL, NRC_CONDITIONS_NOT_CORRECT, ROUTINE_SUBFN_START);
 }
 
 void test_start_routine_another_running_returns_nrc22(void)
@@ -380,7 +387,7 @@ void test_start_routine_another_running_returns_nrc22(void)
 
     bool result = call_handler(raw2, len2, &rsp2, &unlocked);
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp2, ROUTINE_CONTROL, NRC_CONDITIONS_NOT_CORRECT);
+    check_neg_rsp(&rsp2, ROUTINE_CONTROL, NRC_CONDITIONS_NOT_CORRECT, ROUTINE_SUBFN_START);
 }
 
 void test_start_routine_unknown_returns_nrc31(void)
@@ -393,7 +400,7 @@ void test_start_routine_unknown_returns_nrc31(void)
     bool result = call_handler(raw, len, &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_REQUEST_OUT_OF_RANGE);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_REQUEST_OUT_OF_RANGE, ROUTINE_SUBFN_START);
 }
 
 void test_start_routine_missing_routineid_returns_nrc13(void)
@@ -406,7 +413,7 @@ void test_start_routine_missing_routineid_returns_nrc13(void)
     bool result = call_handler(raw, sizeof(raw), &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, ROUTINE_SUBFN_START);
 }
 
 void test_start_routine_secured_without_unlock_returns_nrc33(void)
@@ -419,7 +426,7 @@ void test_start_routine_secured_without_unlock_returns_nrc33(void)
     bool result = call_handler(raw, len, &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SECURITY_ACCESS_DENIED);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SECURITY_ACCESS_DENIED, ROUTINE_SUBFN_START);
 }
 
 void test_start_routine_secured_with_unlock_succeeds(void)
@@ -455,7 +462,7 @@ void test_start_routine_no_start_fn_returns_nrc12(void)
     bool result = call_handler(raw, len, &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED, ROUTINE_SUBFN_START);
 }
 
 void test_start_routine_callback_fails_returns_nrc72(void)
@@ -476,7 +483,7 @@ void test_start_routine_callback_fails_returns_nrc72(void)
     bool result = call_handler(raw, len, &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_GENERAL_PROGRAMMING_FAILURE);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_GENERAL_PROGRAMMING_FAILURE, ROUTINE_SUBFN_START);
 }
 
 /* ======================================================================== *
@@ -518,7 +525,7 @@ void test_stop_routine_not_running_returns_nrc22(void)
     bool result = call_handler(raw, len, &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_CONDITIONS_NOT_CORRECT);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_CONDITIONS_NOT_CORRECT, ROUTINE_SUBFN_STOP);
 }
 
 void test_stop_routine_sprmib_suppresses(void)
@@ -562,7 +569,7 @@ void test_stop_routine_no_stop_fn_returns_nrc12(void)
 
     bool result = call_handler(raw_stop, len_stop, &rsp_stop, &unlocked);
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp_stop, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+    check_neg_rsp(&rsp_stop, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED, ROUTINE_SUBFN_STOP);
 }
 
 /* ======================================================================== *
@@ -609,7 +616,7 @@ void test_request_results_no_results_fn_returns_nrc12(void)
     bool result = call_handler(raw, len, &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED, ROUTINE_SUBFN_REQUEST_RESULTS);
 }
 
 /* ======================================================================== *
@@ -626,7 +633,7 @@ void test_invalid_subfunction_returns_nrc12(void)
     bool result = call_handler(raw, sizeof(raw), &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED, 0x7F);
 }
 
 void test_subfunction_zero_returns_nrc12(void)
@@ -638,7 +645,7 @@ void test_subfunction_zero_returns_nrc12(void)
     bool result = call_handler(raw, sizeof(raw), &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED, 0x00);
 }
 
 /* ======================================================================== *
@@ -671,7 +678,7 @@ void test_default_erase_memory_secured(void)
     bool result = call_handler(raw, len, &rsp, &unlocked);
 
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SECURITY_ACCESS_DENIED);
+    check_neg_rsp(&rsp, ROUTINE_CONTROL, NRC_SECURITY_ACCESS_DENIED, ROUTINE_SUBFN_START);
 }
 
 void test_default_erase_memory_stop_not_supported(void)
@@ -690,7 +697,7 @@ void test_default_erase_memory_stop_not_supported(void)
 
     bool result = call_handler(raw_stop, len_stop, &rsp_stop, &unlocked);
     TEST_ASSERT_TRUE(result);
-    check_neg_rsp(&rsp_stop, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED);
+    check_neg_rsp(&rsp_stop, ROUTINE_CONTROL, NRC_SUB_FUNCTION_NOT_SUPPORTED, ROUTINE_SUBFN_STOP);
 }
 
 void test_default_check_integrity_start_succeeds(void)

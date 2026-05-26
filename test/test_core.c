@@ -136,9 +136,9 @@ void test_reject_empty(void)
 {
     uds_request_t req;
 
-    /* NULL raw with len=0 */
+    /* NULL raw with len=0 — raw==NULL checked first, expect ERR_PARSE */
     uds_status_t status = uds_parse_request(NULL, 0, &req);
-    TEST_ASSERT_EQUAL(UDS_ERR_TOO_SHORT, status);
+    TEST_ASSERT_EQUAL(UDS_ERR_PARSE, status);
 
     /* Non-NULL raw with len=0 */
     uint8_t dummy;
@@ -163,6 +163,17 @@ void test_reject_null_parameters(void)
 }
 
 /* ======================================================================== *
+ * Parse: NULL raw with valid non-zero length — guards against segfault    *
+ *        when raw==NULL is checked AFTER len==0.                          *
+ * ======================================================================== */
+void test_parse_null_raw_with_valid_len(void)
+{
+    uds_request_t req;
+    uds_status_t status = uds_parse_request(NULL, 5, &req);
+    TEST_ASSERT_EQUAL(UDS_ERR_PARSE, status);
+}
+
+/* ======================================================================== *
  * uds_sid_to_response_sid: request SID → response SID mapping             *
  * ======================================================================== */
 void test_sid_to_response_sid(void)
@@ -173,6 +184,12 @@ void test_sid_to_response_sid(void)
     TEST_ASSERT_EQUAL(0x7E, uds_sid_to_response_sid(0x3E));
     TEST_ASSERT_EQUAL(0xC4, uds_sid_to_response_sid(0x84));
     TEST_ASSERT_EQUAL(0xC7, uds_sid_to_response_sid(0x87));
+}
+
+void test_sid_to_response_sid_rejects_invalid(void)
+{
+    /* 0xC0 + 0x40 = 0x100 → uint8_t overflow wraps to 0x00 */
+    TEST_ASSERT_EQUAL(0x00, uds_sid_to_response_sid(0xC0));
 }
 
 /* ======================================================================== *
@@ -251,6 +268,7 @@ int main(void)
     RUN_TEST(test_parse_sid_only);
     RUN_TEST(test_reject_empty);
     RUN_TEST(test_reject_null_parameters);
+    RUN_TEST(test_parse_null_raw_with_valid_len);
 
     /* Serialize tests */
     RUN_TEST(test_serialize_positive_response);
@@ -261,6 +279,7 @@ int main(void)
 
     /* Utility tests */
     RUN_TEST(test_sid_to_response_sid);
+    RUN_TEST(test_sid_to_response_sid_rejects_invalid);
     RUN_TEST(test_is_positive_response);
 
     return UNITY_END();

@@ -262,7 +262,7 @@ static int process_lin_frame(const lin_frame_t *rx_frame)
         /* Negative response */
         st = uds_serialize_negative_response(
             uds_rsp.subfunc_echo,
-            (uds_nrc_t)(uds_rsp.data != NULL ? uds_rsp.data[0] : 0x10),
+            (uds_nrc_t)(uds_rsp.data != NULL && uds_rsp.data_len > 0 ? uds_rsp.data[uds_rsp.data_len - 1] : 0x10),
             serialised, &serialised_len);
     }
     else

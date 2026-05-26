@@ -174,6 +174,23 @@ void test_get_count(void)
     TEST_ASSERT_EQUAL_UINT8(2, uds_service_get_count());
 }
 
+void test_register_table_full_fails(void)
+{
+    /* Fill the entire dispatch table with unique SIDs */
+    for (uint8_t i = 0; i < UDS_SERVICE_TABLE_MAX; i++)
+    {
+        bool ok = uds_service_register((uint8_t)(0x10 + i), stub_echo_handler, UDS_SESSION_ALL);
+        TEST_ASSERT_TRUE(ok);
+    }
+
+    /* Verify count matches max */
+    TEST_ASSERT_EQUAL_UINT8(UDS_SERVICE_TABLE_MAX, uds_service_get_count());
+
+    /* Next registration must fail — table is full */
+    bool ok = uds_service_register(0x99, stub_echo_handler, UDS_SESSION_ALL);
+    TEST_ASSERT_FALSE(ok);
+}
+
 /* ======================================================================== *
  * Dispatch Routing Tests                                                   *
  * ======================================================================== */
@@ -284,6 +301,23 @@ void test_session_availability_non_default(void)
     check_pos_rsp(&rsp, 0x74, 0x00);
 }
 
+void test_dispatch_invalid_session_zero(void)
+{
+    /* Register a handler available in all sessions */
+    uds_service_register(0x22, stub_echo_handler, UDS_SESSION_ALL);
+
+    uds_response_t rsp;
+    uint8_t raw[] = {0x22, 0x01, 0x02};
+
+    /* current_session == 0 must not cause UB, must return NRC 0x7F */
+    bool send = dispatch_raw(raw, sizeof(raw), &rsp, 0, UDS_PHYSICAL, NULL);
+
+    TEST_ASSERT_TRUE(send);
+    TEST_ASSERT_EQUAL_UINT8(0x7F, rsp.sid);
+    TEST_ASSERT_EQUAL_UINT8(NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION,
+                            rsp.data[0]);
+}
+
 /* ======================================================================== *
  * SPRMIB Propagation Tests                                                 *
  * ======================================================================== */
@@ -314,6 +348,63 @@ void test_dispatch_propagates_handler_true(void)
                               UDS_DEFAULT_SESSION, UDS_PHYSICAL, NULL);
 
     TEST_ASSERT_TRUE(send);
+}
+
+/* ======================================================================== *
+ * Local NRC Buffer Tests — no global g_nrc_buf dependency                 *
+ * ======================================================================== */
+
+void test_local_nrc_buf_unknown_sid_returns_nrc11(void)
+{
+    uds_service_clear();
+
+    uds_response_t rsp;
+    uint8_t raw[] = {0x99, 0x00};
+
+    bool send = dispatch_raw(raw, sizeof(raw), &rsp,
+                              UDS_DEFAULT_SESSION, UDS_PHYSICAL, NULL);
+
+    TEST_ASSERT_TRUE(send);
+    check_neg_rsp(&rsp, 0x99, NRC_SERVICE_NOT_SUPPORTED);
+}
+
+void test_local_nrc_buf_session_mismatch_returns_nrc7f(void)
+{
+    uds_service_clear();
+    uds_service_register(0x22, stub_echo_handler, UDS_SESSION_PROGRAMMING);
+
+    uds_response_t rsp;
+    uint8_t raw[] = {0x22, 0x01, 0x02};
+
+    bool send = dispatch_raw(raw, sizeof(raw), &rsp,
+                              UDS_DEFAULT_SESSION, UDS_PHYSICAL, NULL);
+
+    TEST_ASSERT_TRUE(send);
+    check_neg_rsp(&rsp, 0x22, NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION);
+}
+
+void test_local_nrc_buf_independent_calls(void)
+{
+    uds_service_clear();
+    uds_service_register(0x22, stub_echo_handler, UDS_SESSION_PROGRAMMING);
+
+    {
+        uds_response_t rsp1;
+        uint8_t raw1[] = {0x99, 0x00};
+        bool send1 = dispatch_raw(raw1, sizeof(raw1), &rsp1,
+                                   UDS_DEFAULT_SESSION, UDS_PHYSICAL, NULL);
+        TEST_ASSERT_TRUE(send1);
+        check_neg_rsp(&rsp1, 0x99, NRC_SERVICE_NOT_SUPPORTED);
+    }
+
+    {
+        uds_response_t rsp2;
+        uint8_t raw2[] = {0x22, 0x01, 0x02};
+        bool send2 = dispatch_raw(raw2, sizeof(raw2), &rsp2,
+                                   UDS_DEFAULT_SESSION, UDS_PHYSICAL, NULL);
+        TEST_ASSERT_TRUE(send2);
+        check_neg_rsp(&rsp2, 0x22, NRC_SERVICE_NOT_SUPPORTED_IN_ACTIVE_SESSION);
+    }
 }
 
 /* ======================================================================== *
@@ -573,6 +664,7 @@ int main(void)
     RUN_TEST(test_register_null_handler_fails);
     RUN_TEST(test_find_nonexistent_sid);
     RUN_TEST(test_get_count);
+    RUN_TEST(test_register_table_full_fails);
 
     /* Dispatch Routing */
     RUN_TEST(test_dispatch_routing_known_sid);
@@ -583,10 +675,16 @@ int main(void)
     RUN_TEST(test_session_mismatch_returns_nrc7f);
     RUN_TEST(test_session_availability_all_sessions);
     RUN_TEST(test_session_availability_non_default);
+    RUN_TEST(test_dispatch_invalid_session_zero);
 
     /* SPRMIB Propagation */
     RUN_TEST(test_dispatch_propagates_handler_false);
     RUN_TEST(test_dispatch_propagates_handler_true);
+
+    /* Local NRC Buffer — no global dependency */
+    RUN_TEST(test_local_nrc_buf_unknown_sid_returns_nrc11);
+    RUN_TEST(test_local_nrc_buf_session_mismatch_returns_nrc7f);
+    RUN_TEST(test_local_nrc_buf_independent_calls);
 
     /* Functional Addressing NRC Suppression */
     RUN_TEST(test_fa_suppresses_nrc11);

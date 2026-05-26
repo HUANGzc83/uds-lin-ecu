@@ -35,14 +35,14 @@ uds_status_t uds_parse_request(const uint8_t *raw, uint16_t len, uds_request_t *
         return UDS_ERR_PARSE;
     }
 
-    if (len == 0)
-    {
-        return UDS_ERR_TOO_SHORT;
-    }
-
     if (raw == NULL)
     {
         return UDS_ERR_PARSE;
+    }
+
+    if (len == 0)
+    {
+        return UDS_ERR_TOO_SHORT;
     }
 
     /* ----- Extract SID ----- */
@@ -159,5 +159,8 @@ bool uds_is_positive_response(const uint8_t *data)
  * ======================================================================== */
 uint8_t uds_sid_to_response_sid(uint8_t sid)
 {
+    if (!IS_REQUEST_SID(sid)) {
+        return 0x00;
+    }
     return (uint8_t)(sid + 0x40);
 }

@@ -22,6 +22,7 @@
  */
 
 #include "uds/uds_svc_routine.h"
+#include "uds/uds_svc_util.h"    /* uds_set_neg_rsp, uds_set_pos_rsp, uds_should_suppress */
 #include <string.h>   /* memset, memcpy */
 
 /* ======================================================================== *
@@ -30,59 +31,6 @@
 
 /** @brief Static array of routine entries */
 static uds_routine_entry_t g_routine_registry[UDS_ROUTINE_MAX];
-
-/* ======================================================================== *
- * Internal Helpers                                                         *
- * ======================================================================== */
-
-/**
- * @brief Populate a uds_response_t with a negative response.
- *
- * Uses 0x7F as the "SID" so that uds_serialize_response produces:
- *   [0x7F][request_SID][NRC]  — the standard UDS negative response format.
- *
- * @param[out] rsp      Response structure to fill
- * @param[in]  req_sid  Original request SID
- * @param[in]  nrc      Negative response code
- */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc, uint8_t *buf)
-{
-    buf[0] = nrc;
-
-    rsp->sid          = 0x7F;           /* negative response prefix */
-    rsp->subfunc_echo = req_sid;        /* original SID */
-    rsp->data         = buf;            /* points to NRC byte */
-    rsp->data_len     = 1;
-}
-
-/**
- * @brief Build a positive response for RoutineControl.
- *
- * @param[out] rsp       Response structure to fill
- * @param[in]  rsp_sid   Positive response SID (0x71)
- * @param[in]  subfunc   SubFunction value to echo
- * @param[in]  data      Optional payload data pointer (may be NULL)
- * @param[in]  data_len  Payload length in bytes
- */
-static void set_pos_rsp(uds_response_t *rsp, uint8_t rsp_sid,
-                        uint8_t subfunc, const uint8_t *data, uint16_t data_len)
-{
-    rsp->sid          = rsp_sid;
-    rsp->subfunc_echo = subfunc;
-    rsp->data         = data;
-    rsp->data_len     = data_len;
-}
-
-/**
- * @brief Check if the positive response should be suppressed per SPRMIB.
- *
- * @param[in] req  Parsed request (checked for suppress_rsp bit)
- * @return true if response should be suppressed, false otherwise
- */
-static inline bool should_suppress(const uds_request_t *req)
-{
-    return req->subfunction.suppress_rsp;
-}
 
 /**
  * @brief Check whether a subfunction value is a valid RoutineControl subfunction.
@@ -203,7 +151,6 @@ bool uds_svc_routine_control(const uds_request_t *req,
                               uds_response_t      *rsp,
                               void                *context)
 {
-    uint8_t rsp_buf[4];
     uint8_t subfn = req->subfunction.value;
 
     /* --------------------------------------------------------------- *
@@ -211,7 +158,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
      * --------------------------------------------------------------- */
     if (!is_subfn_valid(subfn))
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
+        (void)uds_set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, subfn);
         return true;
     }
 
@@ -220,7 +167,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
      * --------------------------------------------------------------- */
     if (req->data_len < 2u || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        (void)uds_set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, subfn);
         return true;
     }
 
@@ -245,7 +192,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
 
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        (void)uds_set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, subfn);
         return true;
     }
 
@@ -257,7 +204,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
         bool unlocked = (context != NULL) ? *((const bool *)context) : false;
         if (!unlocked)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, subfn);
             return true;
         }
     }
@@ -277,19 +224,19 @@ bool uds_svc_routine_control(const uds_request_t *req,
         /* CNC: check if the routine is already running */
         if (entry->is_running)
         {
-            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, subfn);
             return true;
         }
         /* CNC: check if any other routine is running (one-at-a-time) */
         if (is_any_other_running(routine_id))
         {
-            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, subfn);
             return true;
         }
         /* SFNS: start must be supported (have a callback) */
         if (entry->start_fn == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, subfn);
             return true;
         }
         /* Invoke start callback */
@@ -298,7 +245,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
                                        callback_resp, &callback_resp_len);
         if (!callback_ok)
         {
-            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, subfn);
             return true;
         }
         /* Mark as running */
@@ -309,22 +256,22 @@ bool uds_svc_routine_control(const uds_request_t *req,
         /* CNC: check if the routine is running */
         if (!entry->is_running)
         {
-            set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, subfn);
             return true;
         }
         /* SFNS: stop must be supported */
         if (entry->stop_fn == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, subfn);
             return true;
         }
         /* Invoke stop callback */
         callback_resp_len = sizeof(callback_resp);
         callback_ok = entry->stop_fn(ctrl_params, ctrl_len,
-                                      callback_resp, &callback_resp_len);
+                                       callback_resp, &callback_resp_len);
         if (!callback_ok)
         {
-            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, subfn);
             return true;
         }
         /* Clear running flag */
@@ -335,7 +282,7 @@ bool uds_svc_routine_control(const uds_request_t *req,
         /* SFNS: requestResults must be supported */
         if (entry->results_fn == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, subfn);
             return true;
         }
         /* Invoke results callback (routine does not need to be running) */
@@ -344,21 +291,21 @@ bool uds_svc_routine_control(const uds_request_t *req,
                                          callback_resp, &callback_resp_len);
         if (!callback_ok)
         {
-            set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, rsp_buf);
+            (void)uds_set_neg_rsp(rsp, req->sid, NRC_GENERAL_PROGRAMMING_FAILURE, subfn);
             return true;
         }
         break;
 
     default:
         /* Should not reach (validated above), but defensive */
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
+        (void)uds_set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, subfn);
         return true;
     }
 
     /* --------------------------------------------------------------- *
      * SPRMIB check — suppress only positive responses                 *
      * --------------------------------------------------------------- */
-    if (should_suppress(req))
+    if (uds_should_suppress(req))
     {
         return false;
     }
@@ -366,8 +313,8 @@ bool uds_svc_routine_control(const uds_request_t *req,
     /* --------------------------------------------------------------- *
      * Build positive response with routineStatusRecord                *
      * --------------------------------------------------------------- */
-    set_pos_rsp(rsp, ROUTINE_CONTROL_RSP, subfn,
-                callback_resp, callback_resp_len);
+    (void)uds_set_pos_rsp(rsp, ROUTINE_CONTROL, callback_resp, callback_resp_len);
+    rsp->subfunc_echo = subfn;
     return true;
 }
 
@@ -392,7 +339,10 @@ void uds_svc_routine_init(void)
     erase_mem.start_fn       = routine_erase_memory;
     erase_mem.stop_fn        = NULL; /* stop not supported */
     erase_mem.results_fn     = NULL; /* requestResults not supported */
-    (void)uds_svc_routine_register(&erase_mem);
+    if (!uds_svc_routine_register(&erase_mem))
+        {
+            /* Table full — should not happen with default config */
+        }
 
     /* --------------------------------------------------------------- *
      * Register default routine: 0xFF01 — checkProgrammingIntegrity    *
@@ -408,7 +358,10 @@ void uds_svc_routine_init(void)
     check_int.start_fn       = routine_check_integrity;
     check_int.stop_fn        = NULL;
     check_int.results_fn     = NULL;
-    (void)uds_svc_routine_register(&check_int);
+    if (!uds_svc_routine_register(&check_int))
+        {
+            /* Table full — should not happen with default config */
+        }
 }
 
 bool uds_svc_routine_register(const uds_routine_entry_t *entry)

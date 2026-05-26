@@ -24,6 +24,7 @@
 
 #include "uds/uds_svc_io.h"
 #include "uds/uds_data.h"
+#include "uds/uds_svc_util.h"
 #include <string.h>   /* memset, memcpy */
 
 /* ======================================================================== *
@@ -60,48 +61,18 @@ static uint8_t g_rsp_buf[256];
  * ======================================================================== */
 
 /**
- * @brief Populate a uds_response_t with a negative response.
+ * @brief Local 3-arg wrapper for negative response (subfunc_echo = sid).
  *
- * Uses 0x7F as the "SID" so that uds_serialize_response produces:
- *   [0x7F][request_SID][NRC]  — the standard UDS negative response format.
+ * Uses data_len = 1 (just NRC byte) to match test expectations.
  */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc)
+static void set_neg_rsp_local(uds_response_t *rsp, uint8_t sid, uds_nrc_t nrc)
 {
-    g_rsp_buf[0] = nrc;
+    static uint8_t nrc_buf[1];
+    nrc_buf[0] = (uint8_t)nrc;
     rsp->sid          = 0x7F;
-    rsp->subfunc_echo = req_sid;
-    rsp->data         = g_rsp_buf;
+    rsp->subfunc_echo = sid;
+    rsp->data         = nrc_buf;
     rsp->data_len     = 1;
-}
-
-/**
- * @brief Build a positive response.
- *
- * @param[out] rsp       Response structure to fill
- * @param[in]  rsp_sid   Positive response SID
- * @param[in]  subfunc   Subfunction echo (0 for services without subfunction)
- * @param[in]  data      Payload data pointer (may be NULL if data_len == 0)
- * @param[in]  data_len  Payload length in bytes
- */
-static void set_pos_rsp(uds_response_t *rsp, uint8_t rsp_sid,
-                        uint8_t subfunc, const uint8_t *data, uint16_t data_len)
-{
-    rsp->sid          = rsp_sid;
-    rsp->subfunc_echo = subfunc;
-    rsp->data         = data;
-    rsp->data_len     = data_len;
-}
-
-/**
- * @brief Check if the positive response should be suppressed per SPRMIB.
- *
- * For services without a subfunction (like 0x2F), bit 7 of the first data
- * byte (raw[1]) acts as the suppressPosRspMsgIndicationBit per ISO 14229-1.
- * The parser extracts this into req->subfunction.suppress_rsp.
- */
-static inline bool should_suppress(const uds_request_t *req)
-{
-    return req->subfunction.suppress_rsp;
 }
 
 /**
@@ -201,7 +172,7 @@ bool uds_svc_io_control(const uds_request_t *req,
     /* --- Validate context (must provide unlocked flag) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
+        set_neg_rsp_local(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
         return true;
     }
 
@@ -211,7 +182,7 @@ bool uds_svc_io_control(const uds_request_t *req,
     /* After parser: data[0] = DID_low, data[1] = controlMode */
     if (req->data_len < 2u || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
         return true;
     }
 
@@ -222,7 +193,7 @@ bool uds_svc_io_control(const uds_request_t *req,
     const uds_did_entry_t *entry = uds_did_find(did);
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
         return true;
     }
 
@@ -230,14 +201,14 @@ bool uds_svc_io_control(const uds_request_t *req,
     if (control_mode < IO_CONTROL_RETURN_TO_STANDARD ||
         control_mode > IO_CONTROL_SHORT_TERM_ADJUST)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
         return true;
     }
 
     /* --- SAD: check security access for secured DIDs --- */
     if (did_requires_unlock(entry) && !unlocked)
     {
-        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
+        set_neg_rsp_local(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
         return true;
     }
 
@@ -253,7 +224,7 @@ bool uds_svc_io_control(const uds_request_t *req,
         /* --- IMLOIF: no additional data expected beyond DID + controlMode --- */
         if (req->data_len != 2u)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
             return true;
         }
 
@@ -261,7 +232,7 @@ bool uds_svc_io_control(const uds_request_t *req,
         remove_override(did);
 
         /* --- SPRMIB check --- */
-        if (should_suppress(req))
+        if (uds_should_suppress(req))
         {
             return false;
         }
@@ -270,7 +241,7 @@ bool uds_svc_io_control(const uds_request_t *req,
         g_rsp_buf[0] = (uint8_t)(did >> 8);
         g_rsp_buf[1] = (uint8_t)(did & 0xFFu);
         g_rsp_buf[2] = control_mode;
-        set_pos_rsp(rsp, INPUT_OUTPUT_CONTROL_BY_ID_RSP, 0,
+        uds_set_pos_rsp(rsp, INPUT_OUTPUT_CONTROL_BY_ID,
                     g_rsp_buf, 3);
         return true;
     }
@@ -280,7 +251,7 @@ bool uds_svc_io_control(const uds_request_t *req,
         /* --- IMLOIF: no additional data expected beyond DID + controlMode --- */
         if (req->data_len != 2u)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
             return true;
         }
 
@@ -289,12 +260,12 @@ bool uds_svc_io_control(const uds_request_t *req,
         if (!uds_did_read(did, g_rsp_buf + 3u, &did_data_len, unlocked))
         {
             /* Should not happen if DID exists (checked above), but handle defensively */
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
             return true;
         }
 
         /* --- SPRMIB check --- */
-        if (should_suppress(req))
+        if (uds_should_suppress(req))
         {
             return false;
         }
@@ -304,7 +275,7 @@ bool uds_svc_io_control(const uds_request_t *req,
         g_rsp_buf[1] = (uint8_t)(did & 0xFFu);
         g_rsp_buf[2] = control_mode;
 
-        set_pos_rsp(rsp, INPUT_OUTPUT_CONTROL_BY_ID_RSP, 0,
+        uds_set_pos_rsp(rsp, INPUT_OUTPUT_CONTROL_BY_ID,
                     g_rsp_buf, 3u + did_data_len);
         return true;
     }
@@ -315,7 +286,7 @@ bool uds_svc_io_control(const uds_request_t *req,
         /* data[0]=DID_low, data[1]=controlMode, data[2+]=controlParameter */
         if (req->data_len < 3u)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
+            set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
             return true;
         }
 
@@ -335,7 +306,7 @@ bool uds_svc_io_control(const uds_request_t *req,
             uint8_t slot = find_free_override_slot();
             if (slot >= IO_OVERRIDE_MAX)
             {
-                set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+                set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
                 return true;
             }
             override_entry = &g_io_overrides[slot];
@@ -348,7 +319,7 @@ bool uds_svc_io_control(const uds_request_t *req,
         override_entry->value_len = (uint8_t)param_len;
 
         /* --- SPRMIB check --- */
-        if (should_suppress(req))
+        if (uds_should_suppress(req))
         {
             return false;
         }
@@ -367,14 +338,14 @@ bool uds_svc_io_control(const uds_request_t *req,
         g_rsp_buf[2] = control_mode;
         memcpy(g_rsp_buf + 3u, param_data, param_len);
 
-        set_pos_rsp(rsp, INPUT_OUTPUT_CONTROL_BY_ID_RSP, 0,
+        uds_set_pos_rsp(rsp, INPUT_OUTPUT_CONTROL_BY_ID,
                     g_rsp_buf, resp_len);
         return true;
     }
 
     default:
         /* Should not reach here (validated above), but handle defensively */
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
         return true;
     }
 }

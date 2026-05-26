@@ -35,6 +35,8 @@ extern "C" {
 /** @brief LIN frame data field size in bytes (8 as per LIN 2.x / ISO 17987-3) */
 #define LIN_FRAME_SIZE    8
 
+_Static_assert(LIN_FRAME_SIZE == 8, "LIN frame must be 8 bytes");
+
 /** @brief Maximum UDS data bytes in a single frame (8 - 1 NAD - 1 PCI) */
 #define LIN_SF_MAX_LEN    6
 

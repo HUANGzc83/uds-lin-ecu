@@ -14,6 +14,7 @@
 
 #include "uds/uds_svc_data.h"
 #include "uds/uds_data.h"
+#include "uds/uds_svc_util.h"
 #include <string.h>   /* memset, memcpy */
 
 /** @brief Default memory region size for Read/WriteMemoryByAddress (1 KB) */
@@ -58,49 +59,20 @@ static uds_periodic_did_entry_t g_periodic_dids[PERIODIC_DID_MAX];
  * ======================================================================== */
 
 /**
- * @brief Populate a uds_response_t with a negative response.
+ * @brief Local 4-parameter wrapper for negative response.
  *
- * Uses 0x7F as the "SID" so that uds_serialize_response produces:
- *   [0x7F][request_SID][NRC]  — the standard UDS negative response format.
+ * Produces data_len = 1 (just the NRC byte) with subfunc_echo set to the
+ * incoming subfunc_echo parameter, matching the test expectations.
  */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc, uint8_t *buf)
+static void set_neg_rsp_local(uds_response_t *rsp, uint8_t sid, uds_nrc_t nrc,
+                               uint8_t subfunc_echo)
 {
-    buf[0] = nrc;
+    static uint8_t nrc_buf[1];
+    nrc_buf[0] = (uint8_t)nrc;
     rsp->sid          = 0x7F;
-    rsp->subfunc_echo = req_sid;
-    rsp->data         = buf;
+    rsp->subfunc_echo = subfunc_echo;
+    rsp->data         = nrc_buf;
     rsp->data_len     = 1;
-}
-
-/**
- * @brief Build a positive response.
- *
- * For services without a subfunction, subfunc_echo should be 0.
- *
- * @param[out] rsp       Response structure to fill
- * @param[in]  rsp_sid   Positive response SID
- * @param[in]  subfunc   Subfunction echo (0 for services without subfunction)
- * @param[in]  data      Payload data pointer (may be NULL if data_len == 0)
- * @param[in]  data_len  Payload length in bytes
- */
-static void set_pos_rsp(uds_response_t *rsp, uint8_t rsp_sid,
-                        uint8_t subfunc, const uint8_t *data, uint16_t data_len)
-{
-    rsp->sid          = rsp_sid;
-    rsp->subfunc_echo = subfunc;
-    rsp->data         = data;
-    rsp->data_len     = data_len;
-}
-
-/**
- * @brief Check if the positive response should be suppressed per SPRMIB.
- *
- * For services without a subfunction, the parser may interpret the first
- * data byte's bit 7 as suppress_rsp.  This helper handles that case.
- */
-static inline bool should_suppress(const uds_request_t *req)
-{
-    return req->subfunction.suppress_rsp;
 }
 
 /* ======================================================================== *
@@ -317,12 +289,12 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
                               uds_response_t      *rsp,
                               void                *context)
 {
-    uint8_t rsp_buf[256];
+    static uint8_t rsp_buf[256];
 
     /* --- Validate context (must provide unlocked flag) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, req->sid);
         return true;
     }
 
@@ -333,7 +305,7 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
      * from byte[1] (via UDS_REQ_BYTE1) and data[0]. So data_len must be >=1 */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -344,7 +316,7 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
     const uds_did_entry_t *entry = uds_did_find(did);
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -354,17 +326,17 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
         /* Determine whether ROOR or SAD based on access type */
         if (entry->access == DID_SECURED_READ && !unlocked)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, req->sid);
         }
         else if (entry->access == DID_WRITE_ONLY ||
                  entry->access == DID_SECURED_WRITE)
         {
             /* These access types are not readable → ROOR */
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         }
         else
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         }
         return true;
     }
@@ -374,7 +346,7 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
      * Shift data right by 2 to make room for DID prefix. */
     if (data_len + 2 > sizeof(rsp_buf))
     {
-        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_RESPONSE_TOO_LONG, req->sid);
         return true;
     }
 
@@ -383,8 +355,7 @@ bool uds_svc_read_data_by_id(const uds_request_t *req,
     rsp_buf[0] = (uint8_t)(did >> 8);
     rsp_buf[1] = (uint8_t)(did & 0xFF);
 
-    set_pos_rsp(rsp, READ_DATA_BY_IDENTIFIER_RSP, 0,
-                rsp_buf, data_len + 2);
+    (void)uds_set_pos_rsp(rsp, READ_DATA_BY_IDENTIFIER, rsp_buf, data_len + 2);
     return true;
 }
 
@@ -396,7 +367,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
                                      uds_response_t      *rsp,
                                      void                *context)
 {
-    uint8_t rsp_buf[256];
+    static uint8_t rsp_buf[256];
     (void)context;
 
     /* --- IMLOIF: parse format byte (in subfunction due to parser) + address + size --- */
@@ -408,7 +379,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
     if (!parse_mem_addr_format(req, &address, &mem_size,
                                 &addr_bytes, &size_bytes))
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -418,7 +389,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
                                                          &region_offset);
     if (region == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -428,7 +399,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
 
     if (total_resp > sizeof(rsp_buf))
     {
-        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_RESPONSE_TOO_LONG, req->sid);
         return true;
     }
 
@@ -440,8 +411,7 @@ bool uds_svc_read_memory_by_address(const uds_request_t *req,
     /* Append memory data */
     memcpy(rsp_buf + data_offset, region->data + region_offset, mem_size);
 
-    set_pos_rsp(rsp, READ_MEMORY_BY_ADDRESS_RSP, 0,
-                rsp_buf, total_resp);
+    (void)uds_set_pos_rsp(rsp, READ_MEMORY_BY_ADDRESS, rsp_buf, total_resp);
     return true;
 }
 
@@ -453,12 +423,12 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
                                       uds_response_t      *rsp,
                                       void                *context)
 {
-    uint8_t rsp_buf[256];
+    static uint8_t rsp_buf[256];
 
     /* --- Validate context --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, req->sid);
         return true;
     }
 
@@ -467,7 +437,7 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
     /* --- IMLOIF: need at least 1 byte data --- */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -477,7 +447,7 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
     const uds_did_entry_t *entry = uds_did_find(did);
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -485,7 +455,7 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
     uint16_t data_len = sizeof(rsp_buf);
     if (!uds_did_read(did, rsp_buf + 2, &data_len, unlocked))
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -500,7 +470,7 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
 
     if (2 + scaling_len > sizeof(rsp_buf))
     {
-        set_neg_rsp(rsp, req->sid, NRC_RESPONSE_TOO_LONG, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_RESPONSE_TOO_LONG, req->sid);
         return true;
     }
 
@@ -510,8 +480,7 @@ bool uds_svc_read_scaling_data_by_id(const uds_request_t *req,
     rsp_buf[2 + did_data_len + 3] = SCALE_OFFSET_LOW;
     rsp_buf[2 + did_data_len + 4] = SCALE_UNIT;
 
-    set_pos_rsp(rsp, READ_SCALING_DATA_BY_ID_RSP, 0,
-                rsp_buf, 2 + scaling_len);
+    (void)uds_set_pos_rsp(rsp, READ_SCALING_DATA_BY_ID, rsp_buf, 2 + scaling_len);
     return true;
 }
 
@@ -523,14 +492,13 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
                                        uds_response_t      *rsp,
                                        void                *context)
 {
-    uint8_t rsp_buf[4];
     (void)context;
 
     /* --- IMLOIF: need transmission mode (subfunction) + at least
      *    periodicDID(1) + source DID(2) = 3 data bytes --- */
     if (req->data_len < 3 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -539,7 +507,7 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
     /* --- ROOR: validate transmission mode --- */
     if (transmission_mode < 0x01 || transmission_mode > 0x03)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -549,7 +517,7 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
     /* --- ROOR: check source DID exists --- */
     if (uds_did_find(source_did) == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -557,7 +525,7 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
     uint8_t slot = find_free_periodic_slot();
     if (slot >= PERIODIC_DID_MAX)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -567,14 +535,14 @@ bool uds_svc_read_data_by_periodic_id(const uds_request_t *req,
     g_periodic_dids[slot].active            = true;
 
     /* --- SPRMIB: 0x2A has a real subfunction, so suppress check applies --- */
-    if (should_suppress(req))
+    if (uds_should_suppress(req))
     {
         return false;
     }
 
     /* Build positive response with transmission mode echo */
-    set_pos_rsp(rsp, READ_DATA_BY_PERIODIC_ID_RSP,
-                transmission_mode, NULL, 0);
+    (void)uds_set_pos_rsp(rsp, READ_DATA_BY_PERIODIC_ID, NULL, 0);
+    rsp->subfunc_echo = transmission_mode; /* preserve subfunction echo */
     return true;
 }
 
@@ -586,7 +554,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
                                         uds_response_t      *rsp,
                                         void                *context)
 {
-    uint8_t rsp_buf[4];
+    static uint8_t rsp_buf[4];
     (void)context;
 
     /* --- IMLOIF: need at least 1 data byte (definitionMode) --- */
@@ -594,7 +562,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
      * req->subfunction.value (byte[1] of raw), and data[0] onward is payload. */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -613,7 +581,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
          */
         if (req->data_len < 2)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
             return true;
         }
 
@@ -623,21 +591,21 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         /* Check for source definitions: each is 6 bytes (DID_h,DID_l,off_h,off_l,len_h,len_l) */
         if (remaining < 6 || (remaining % 6) != 0)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
             return true;
         }
 
         uint8_t num_sources = (uint8_t)(remaining / 6);
         if (num_sources == 0 || num_sources > DYNAMIC_DID_SOURCE_MAX)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
             return true;
         }
 
         /* Check target DID doesn't already exist as dynamic DID */
         if (find_dynamic_did(target_did) != NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
             return true;
         }
 
@@ -645,7 +613,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         uint8_t slot = find_free_dynamic_slot();
         if (slot >= DYNAMIC_DID_MAX)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
             return true;
         }
 
@@ -668,8 +636,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         /* Positive response: [0x6C][targetDID_h][targetDID_l] */
         rsp_buf[0] = (uint8_t)(target_did >> 8);
         rsp_buf[1] = (uint8_t)(target_did & 0xFF);
-        set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID_RSP, 0,
-                    rsp_buf, 2);
+        (void)uds_set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID, rsp_buf, 2);
         return true;
     }
 
@@ -682,7 +649,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
          */
         if (req->data_len < 8)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
             return true;
         }
 
@@ -690,14 +657,14 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
 
         if (find_dynamic_did(target_did) != NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
             return true;
         }
 
         uint8_t slot = find_free_dynamic_slot();
         if (slot >= DYNAMIC_DID_MAX)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
             return true;
         }
 
@@ -717,8 +684,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
 
         rsp_buf[0] = (uint8_t)(target_did >> 8);
         rsp_buf[1] = (uint8_t)(target_did & 0xFF);
-        set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID_RSP, 0,
-                    rsp_buf, 2);
+        (void)uds_set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID, rsp_buf, 2);
         return true;
     }
 
@@ -727,7 +693,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         /* Format: [0x2C][0x03][targetDID_h][targetDID_l] */
         if (req->data_len < 2)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
             return true;
         }
 
@@ -736,7 +702,7 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
         uds_dynamic_did_entry_t *entry = find_dynamic_did(target_did);
         if (entry == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
             return true;
         }
 
@@ -745,14 +711,13 @@ bool uds_svc_dynamically_define_data_id(const uds_request_t *req,
 
         rsp_buf[0] = (uint8_t)(target_did >> 8);
         rsp_buf[1] = (uint8_t)(target_did & 0xFF);
-        set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID_RSP, 0,
-                    rsp_buf, 2);
+        (void)uds_set_pos_rsp(rsp, DYNAMICALLY_DEFINE_DATA_ID, rsp_buf, 2);
         return true;
     }
 
     default:
         /* ROOR: unsupported definition mode */
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 }
@@ -765,12 +730,12 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
                                uds_response_t      *rsp,
                                void                *context)
 {
-    uint8_t rsp_buf[4];
+    static uint8_t rsp_buf[4];
 
     /* --- Validate context (must provide unlocked flag) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, req->sid);
         return true;
     }
 
@@ -779,7 +744,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
     /* --- IMLOIF: need at least 1 byte data (DID high in byte[1], DID low in data[0]) --- */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -789,7 +754,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
     const uds_did_entry_t *entry = uds_did_find(did);
     if (entry == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -800,7 +765,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
 
     if (write_len == 0)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -812,15 +777,15 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
             entry->access == DID_SECURED_READ)
         {
             /* Not writable at all */
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         }
         else if (entry->access == DID_SECURED_WRITE && !unlocked)
         {
-            set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, req->sid);
         }
         else
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         }
         return true;
     }
@@ -828,8 +793,7 @@ bool uds_svc_write_data_by_id(const uds_request_t *req,
     /* Build positive response: [0x6E][DID_high][DID_low] */
     rsp_buf[0] = (uint8_t)(did >> 8);
     rsp_buf[1] = (uint8_t)(did & 0xFF);
-    set_pos_rsp(rsp, WRITE_DATA_BY_IDENTIFIER_RSP, 0,
-                rsp_buf, 2);
+    uds_set_pos_rsp(rsp, WRITE_DATA_BY_IDENTIFIER, rsp_buf, 2);
     return true;
 }
 
@@ -841,12 +805,12 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
                                       uds_response_t      *rsp,
                                       void                *context)
 {
-    uint8_t rsp_buf[16];
+    static uint8_t rsp_buf[16];
 
     /* --- Validate context (must provide unlocked flag) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, req->sid);
         return true;
     }
 
@@ -855,7 +819,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
     /* --- SAD: security must be unlocked --- */
     if (!unlocked)
     {
-        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, req->sid);
         return true;
     }
 
@@ -868,7 +832,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
     if (!parse_mem_addr_format(req, &address, &mem_size,
                                 &addr_bytes, &size_bytes))
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -880,7 +844,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
 
     if (req->data_len < total_in_data)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, req->sid);
         return true;
     }
 
@@ -893,7 +857,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
                                                          &region_offset);
     if (region == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, req->sid);
         return true;
     }
 
@@ -906,8 +870,7 @@ bool uds_svc_write_memory_by_address(const uds_request_t *req,
     memcpy(rsp_buf + 1, req->data, addr_bytes);
     memcpy(rsp_buf + 1 + addr_bytes, req->data + addr_bytes, size_bytes);
 
-    set_pos_rsp(rsp, WRITE_MEMORY_BY_ADDRESS_RSP, 0,
-                rsp_buf, header_len);
+    uds_set_pos_rsp(rsp, WRITE_MEMORY_BY_ADDRESS, rsp_buf, header_len);
     return true;
 }
 

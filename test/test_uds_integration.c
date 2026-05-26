@@ -212,7 +212,7 @@ static int round_trip_uds(const uint8_t *uds_req_data, uint16_t uds_req_len,
     serialised_len = sizeof(serialised);
     if (uds_rsp.sid == 0x7F)
     {
-        uint8_t nrc = (uds_rsp.data != NULL) ? uds_rsp.data[0] : 0x10;
+        uint8_t nrc = (uds_rsp.data != NULL && uds_rsp.data_len > 0) ? uds_rsp.data[uds_rsp.data_len - 1] : 0x10;
         st = uds_serialize_negative_response(
                 uds_rsp.subfunc_echo, (uds_nrc_t)nrc,
                 serialised, &serialised_len);
@@ -308,7 +308,7 @@ static int round_trip_uds_ex(const uint8_t *uds_req_data, uint16_t uds_req_len,
     serialised_len = sizeof(serialised);
     if (uds_rsp.sid == 0x7F)
     {
-        uint8_t nrc = (uds_rsp.data != NULL) ? uds_rsp.data[0] : 0x10;
+        uint8_t nrc = (uds_rsp.data != NULL && uds_rsp.data_len > 0) ? uds_rsp.data[uds_rsp.data_len - 1] : 0x10;
         st = uds_serialize_negative_response(
                 uds_rsp.subfunc_echo, (uds_nrc_t)nrc,
                 serialised, &serialised_len);

@@ -23,53 +23,7 @@
 #include "uds/uds_dtc.h"
 #include "uds/uds_session.h"
 #include <string.h>   /* memset, memcpy */
-
-/* ======================================================================== *
- * Internal Helpers                                                          *
- * ======================================================================== */
-
-/**
- * @brief Populate a uds_response_t with a negative response.
- *
- * Uses 0x7F as the "SID" so that uds_serialize_response produces:
- *   [0x7F][request_SID][NRC]  — the standard UDS negative response format.
- */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc, uint8_t *buf)
-{
-    buf[0] = nrc;
-    rsp->sid          = 0x7F;
-    rsp->subfunc_echo = req_sid;
-    rsp->data         = buf;
-    rsp->data_len     = 1;
-}
-
-/**
- * @brief Build a positive response.
- *
- * @param[out] rsp       Response structure to fill
- * @param[in]  rsp_sid   Positive response SID
- * @param[in]  subfunc   Subfunction echo (0 for services without subfunction)
- * @param[in]  data      Payload data pointer (may be NULL if data_len == 0)
- * @param[in]  data_len  Payload length in bytes
- */
-static void set_pos_rsp(uds_response_t *rsp, uint8_t rsp_sid,
-                        uint8_t subfunc, const uint8_t *data, uint16_t data_len)
-{
-    rsp->sid          = rsp_sid;
-    rsp->subfunc_echo = subfunc;
-    rsp->data         = data;
-    rsp->data_len     = data_len;
-}
-
-/**
- * @brief Check if the positive response should be suppressed per SPRMIB.
- *
- * Only meaningful for subfunction-based services (0x19).
- */
-static inline bool should_suppress(const uds_request_t *req)
-{
-    return req->subfunction.suppress_rsp;
-}
+#include "uds/uds_svc_util.h"
 
 /**
  * @brief Compute the DTCStatusAvailabilityMask for a set of DTCs.
@@ -122,6 +76,23 @@ static uint16_t write_dtc_records(const uint32_t *dtcs, uint16_t count,
 }
 
 /* ======================================================================== *
+ * Internal Helper                                                          *
+ * ======================================================================== */
+
+/**
+ * @brief Local 3-arg wrapper for negative response (subfunc_echo = sid).
+ */
+static void set_neg_rsp_local(uds_response_t *rsp, uint8_t sid, uds_nrc_t nrc)
+{
+    static uint8_t nrc_buf[1];
+    nrc_buf[0] = (uint8_t)nrc;
+    rsp->sid          = 0x7F;
+    rsp->subfunc_echo = sid;
+    rsp->data         = nrc_buf;
+    rsp->data_len     = 1;
+}
+
+/* ======================================================================== *
  * ReadDTCInformation Subfunction Handlers                                  *
  * ======================================================================== */
 
@@ -134,12 +105,12 @@ static uint16_t write_dtc_records(const uint32_t *dtcs, uint16_t count,
 static bool handle_report_number_dtc(const uds_request_t *req,
                                      uds_response_t      *rsp)
 {
-    uint8_t rsp_buf[4];
+    static uint8_t rsp_buf[4];
 
     /* IMLOIF: need exactly 1 data byte (statusMask) */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
         return true;
     }
 
@@ -159,12 +130,13 @@ static bool handle_report_number_dtc(const uds_request_t *req,
     rsp_buf[3] = (uint8_t)( count       & 0xFF);
 
     /* SPRMIB check */
-    if (should_suppress(req))
+    if (uds_should_suppress(req))
     {
         return false;
     }
 
-    set_pos_rsp(rsp, READ_DTC_INFO_RSP, 0x01, rsp_buf, 4);
+    uds_set_pos_rsp(rsp, READ_DTC_INFO, rsp_buf, 4);
+    rsp->subfunc_echo = 0x01;
     return true;
 }
 
@@ -177,12 +149,12 @@ static bool handle_report_number_dtc(const uds_request_t *req,
 static bool handle_report_dtc_by_mask(const uds_request_t *req,
                                       uds_response_t      *rsp)
 {
-    uint8_t rsp_buf[256];
+    static uint8_t rsp_buf[256];
 
     /* IMLOIF: need exactly 1 data byte (statusMask) */
     if (req->data_len < 1 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
         return true;
     }
 
@@ -206,13 +178,14 @@ static bool handle_report_dtc_by_mask(const uds_request_t *req,
                                            (uint16_t)(sizeof(rsp_buf) - data_offset));
 
     /* SPRMIB check */
-    if (should_suppress(req))
+    if (uds_should_suppress(req))
     {
         return false;
     }
 
-    set_pos_rsp(rsp, READ_DTC_INFO_RSP, 0x02,
-                rsp_buf, (uint16_t)(data_offset + dtc_bytes));
+    uds_set_pos_rsp(rsp, READ_DTC_INFO, rsp_buf,
+                    (uint16_t)(data_offset + dtc_bytes));
+    rsp->subfunc_echo = 0x02;
     return true;
 }
 
@@ -229,12 +202,12 @@ static bool handle_report_dtc_by_mask(const uds_request_t *req,
 static bool handle_report_extended_data(const uds_request_t *req,
                                         uds_response_t      *rsp)
 {
-    uint8_t rsp_buf[256];
+    static uint8_t rsp_buf[256];
 
     /* IMLOIF: need exactly 4 data bytes (DTC(3) + recordNumber(1)) */
     if (req->data_len < 4 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
         return true;
     }
 
@@ -258,7 +231,7 @@ static bool handle_report_extended_data(const uds_request_t *req,
         uint16_t snap_len = 0;
         if (!uds_dtc_get_snapshot(dtc, rsp_buf + 4, &snap_len))
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
             return true;
         }
         ext_len = snap_len;
@@ -269,7 +242,7 @@ static bool handle_report_extended_data(const uds_request_t *req,
         uint16_t ext_data_len = 0;
         if (!uds_dtc_get_extended(dtc, rsp_buf + 4, &ext_data_len))
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
             return true;
         }
         ext_len = ext_data_len;
@@ -277,18 +250,18 @@ static bool handle_report_extended_data(const uds_request_t *req,
     else
     {
         /* Unsupported record number */
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE);
         return true;
     }
 
     /* SPRMIB check */
-    if (should_suppress(req))
+    if (uds_should_suppress(req))
     {
         return false;
     }
 
-    set_pos_rsp(rsp, READ_DTC_INFO_RSP, 0x06,
-                rsp_buf, (uint16_t)(4 + ext_len));
+    uds_set_pos_rsp(rsp, READ_DTC_INFO, rsp_buf, (uint16_t)(4 + ext_len));
+    rsp->subfunc_echo = 0x06;
     return true;
 }
 
@@ -304,12 +277,12 @@ static bool handle_report_extended_data(const uds_request_t *req,
 static bool handle_report_supported_dtc(const uds_request_t *req,
                                         uds_response_t      *rsp)
 {
-    uint8_t rsp_buf[256];
+    static uint8_t rsp_buf[256];
 
     /* IMLOIF: no additional data expected */
     if (req->data_len != 0)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
         return true;
     }
 
@@ -330,13 +303,14 @@ static bool handle_report_supported_dtc(const uds_request_t *req,
                                            (uint16_t)(sizeof(rsp_buf) - data_offset));
 
     /* SPRMIB check */
-    if (should_suppress(req))
+    if (uds_should_suppress(req))
     {
         return false;
     }
 
-    set_pos_rsp(rsp, READ_DTC_INFO_RSP, 0x0A,
-                rsp_buf, (uint16_t)(data_offset + dtc_bytes));
+    uds_set_pos_rsp(rsp, READ_DTC_INFO, rsp_buf,
+                    (uint16_t)(data_offset + dtc_bytes));
+    rsp->subfunc_echo = 0x0A;
     return true;
 }
 
@@ -348,12 +322,10 @@ bool uds_svc_clear_diagnostic_info(const uds_request_t *req,
                                    uds_response_t      *rsp,
                                    void                *context)
 {
-    uint8_t rsp_buf[4];
-
     /* --- CNC: context must be provided --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
         return true;
     }
 
@@ -363,14 +335,14 @@ bool uds_svc_clear_diagnostic_info(const uds_request_t *req,
     /* --- CNC: session must be non-default --- */
     if (sctx == NULL || sctx->current_session == UDS_DEFAULT_SESSION)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT);
         return true;
     }
 
     /* --- SAD: security must be unlocked --- */
     if (ctx->unlocked == NULL || !(*ctx->unlocked))
     {
-        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED);
         return true;
     }
 
@@ -379,7 +351,7 @@ bool uds_svc_clear_diagnostic_info(const uds_request_t *req,
      * subfunction.value + suppress_rsp bit. Remaining data should be 2 bytes. */
     if (req->data_len != 2 || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT);
         return true;
     }
 
@@ -399,7 +371,7 @@ bool uds_svc_clear_diagnostic_info(const uds_request_t *req,
     /* Positive response: [0x54]  (no subfunction, no additional data).
      * The serializer will write [0x54][0x00] due to subfunc_echo always
      * being serialized; the dispatch layer handles this. */
-    set_pos_rsp(rsp, CLEAR_DIAGNOSTIC_INFO_RSP, 0, NULL, 0);
+    uds_set_pos_rsp(rsp, CLEAR_DIAGNOSTIC_INFO, NULL, 0);
     return true;
 }
 
@@ -411,7 +383,6 @@ bool uds_svc_read_dtc_info(const uds_request_t *req,
                            uds_response_t      *rsp,
                            void                *context)
 {
-    uint8_t rsp_buf[4];
     (void)context;
 
     uint8_t subfn = req->subfunction.value;
@@ -433,7 +404,7 @@ bool uds_svc_read_dtc_info(const uds_request_t *req,
 
     default:
         /* SFNS: unsupported subfunction */
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
+        set_neg_rsp_local(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED);
         return true;
     }
 }

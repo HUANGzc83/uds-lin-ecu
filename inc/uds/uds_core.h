@@ -18,15 +18,22 @@
  * ======================================================================== */
 
 #if defined(__GNUC__) || defined(__clang__)
-#define UDS_PACKED __attribute__((packed))
+#define UDS_PACKED_BEGIN _Pragma("pack(push, 1)")
+#define UDS_PACKED_END   _Pragma("pack(pop)")
 #elif defined(_MSC_VER)
-#define UDS_PACKED __pragma(pack(push, 1))
+#define UDS_PACKED_BEGIN __pragma(pack(push, 1))
+#define UDS_PACKED_END   __pragma(pack(pop))
 #elif defined(__ARMCC_VERSION)
-#define UDS_PACKED __attribute__((packed))
+#define UDS_PACKED_BEGIN _Pragma("pack(push, 1)")
+#define UDS_PACKED_END   _Pragma("pack(pop)")
 #else
-#define UDS_PACKED
-#warning "UDS_PACKED not defined for this compiler"
+#define UDS_PACKED_BEGIN
+#define UDS_PACKED_END
+#warning "UDS_PACKED_BEGIN/END not defined for this compiler"
 #endif
+
+/* Backward-compatibility alias */
+#define UDS_PACKED UDS_PACKED_BEGIN
 
 #ifdef __cplusplus
 extern "C" {
@@ -182,10 +189,14 @@ typedef enum {
  * ======================================================================== */
 
 /** @brief UDS subfunction parameter byte (bit 7 = suppressPosRspMsgIndicationBit) */
-typedef struct UDS_PACKED {
+UDS_PACKED_BEGIN
+typedef struct {
     uint8_t value        : 7; /**< @brief Subfunction value (bits 6:0) */
     uint8_t suppress_rsp : 1; /**< @brief Suppress positive response indication (bit 7) */
 } uds_subfunction_t;
+UDS_PACKED_END
+
+_Static_assert(sizeof(uds_subfunction_t) == 1, "subfunction must be 1 byte");
 
 /* ======================================================================== *
  * Addressing Type Enum                                                     *

@@ -26,7 +26,8 @@
 #include "uds/uds_svc_upload.h"
 #include "uds/uds_session.h"
 #include "uds/uds_security.h"
-#include "uds/uds_svc_data.h"    /* for UDS_REQ_BYTE1, UDS_REQ_BYTE1 macros */
+#include "uds/uds_svc_data.h"    /* for UDS_REQ_BYTE1 macro */
+#include "uds/uds_svc_util.h"    /* uds_set_neg_rsp, uds_set_pos_rsp, uds_should_suppress */
 #include <string.h>              /* memset, memcpy */
 
 /* ======================================================================== *
@@ -45,46 +46,6 @@ static uds_transfer_mem_region_t g_mem_regions[UDS_MEM_REGION_MAX];
 
 /** @brief Number of valid entries in g_mem_regions */
 static uint16_t g_mem_region_count = 0u;
-
-/* ======================================================================== *
- * Internal Helpers — Response Builders                                    *
- * ======================================================================== */
-
-/**
- * @brief Populate a uds_response_t with a negative response.
- *
- * Uses 0x7F as the "SID" so that uds_serialize_response produces:
- *   [0x7F][request_SID][NRC]
- */
-static void set_neg_rsp(uds_response_t *rsp, uint8_t req_sid, uint8_t nrc, uint8_t *buf)
-{
-    buf[0] = nrc;
-    rsp->sid          = 0x7F;
-    rsp->subfunc_echo = req_sid;
-    rsp->data         = buf;
-    rsp->data_len     = 1;
-}
-
-/**
- * @brief Build a positive response.
- *
- * For services without a subfunction, subfunc_echo should be 0 since the
- * serializer always writes it as the second byte.
- *
- * @param[out] rsp       Response structure to fill
- * @param[in]  rsp_sid   Positive response SID
- * @param[in]  subfunc   Subfunction echo (0 for services without subfunction)
- * @param[in]  data      Payload data pointer (may be NULL if data_len == 0)
- * @param[in]  data_len  Payload length in bytes
- */
-static void set_pos_rsp(uds_response_t *rsp, uint8_t rsp_sid,
-                        uint8_t subfunc, const uint8_t *data, uint16_t data_len)
-{
-    rsp->sid          = rsp_sid;
-    rsp->subfunc_echo = subfunc;
-    rsp->data         = data;
-    rsp->data_len     = data_len;
-}
 
 /* ======================================================================== *
  * Internal Helpers — Validation                                           *
@@ -138,17 +99,6 @@ static bool is_memory_range_valid(uint32_t address, uint32_t size)
     return false;
 }
 
-/**
- * @brief Reconstruct the first byte of the request payload (byte[1]).
- *
- * The parser consumes byte[1] as subfunction.  This macro recovers it
- * from the parsed subfunction struct.  Defined in uds_svc_data.h.
- */
-#ifndef UDS_REQ_BYTE1
-#define UDS_REQ_BYTE1(req) \
-    ((uint8_t)((req)->subfunction.value | ((req)->subfunction.suppress_rsp << 7)))
-#endif
-
 /* ======================================================================== *
  * Shared Logic: 0x34 RequestDownload / 0x35 RequestUpload                 *
  * ======================================================================== */
@@ -166,15 +116,18 @@ static bool is_memory_range_valid(uint32_t address, uint32_t size)
 static bool request_transfer_common(const uds_request_t  *req,
                                     uds_response_t       *rsp,
                                     void                 *context,
-                                    uds_transfer_direction_t direction,
-                                    uint8_t               rsp_sid)
+                                    uds_transfer_direction_t direction)
 {
-    uint8_t rsp_buf[4];
+    static uint8_t rsp_buf[4];
 
     /* --- CNC: validate context (session context required) --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_CONDITIONS_NOT_CORRECT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -183,14 +136,22 @@ static bool request_transfer_common(const uds_request_t  *req,
     /* --- CNC: session must be programming or extended --- */
     if (!is_transfer_session_allowed(sctx))
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_CONDITIONS_NOT_CORRECT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
     /* --- SAD: security must be unlocked --- */
     if (!uds_security_is_unlocked())
     {
-        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_SECURITY_ACCESS_DENIED;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -199,7 +160,11 @@ static bool request_transfer_common(const uds_request_t  *req,
      * raw+2 which contains [addr(4)][size(4)], so we need data_len >= 8. */
     if (req->data_len < 8u || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -222,21 +187,33 @@ static bool request_transfer_common(const uds_request_t  *req,
     /* If size exceeds our buffer, reject before checking memory range. */
     if (mem_size > UDS_TRANSFER_BUFFER_SIZE)
     {
-        set_neg_rsp(rsp, req->sid, NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
     /* --- ROOR / UDNA: check memory address and size validity --- */
     if (mem_size == 0u || !is_memory_range_valid(mem_addr, mem_size))
     {
-        set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_REQUEST_OUT_OF_RANGE;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
     /* --- UDNA: refuse if a transfer is already active --- */
     if (g_transfer_ctx.active)
     {
-        set_neg_rsp(rsp, req->sid, NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_UPLOAD_DOWNLOAD_NOT_ACCEPTED;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -256,7 +233,7 @@ static bool request_transfer_common(const uds_request_t  *req,
     rsp_buf[0] = (uint8_t)((max_blk >> 8) & 0xFFu);
     rsp_buf[1] = (uint8_t)( max_blk        & 0xFFu);
 
-    set_pos_rsp(rsp, rsp_sid, 0, rsp_buf, 2);
+    (void)uds_set_pos_rsp(rsp, req->sid, rsp_buf, 2);
     return true;
 }
 
@@ -269,8 +246,7 @@ bool uds_svc_request_download(const uds_request_t *req,
                                void                *context)
 {
     return request_transfer_common(req, rsp, context,
-                                   UDS_TRANSFER_DOWNLOAD,
-                                   REQUEST_DOWNLOAD_RSP);
+                                   UDS_TRANSFER_DOWNLOAD);
 }
 
 /* ======================================================================== *
@@ -282,8 +258,7 @@ bool uds_svc_request_upload(const uds_request_t *req,
                              void                *context)
 {
     return request_transfer_common(req, rsp, context,
-                                   UDS_TRANSFER_UPLOAD,
-                                   REQUEST_UPLOAD_RSP);
+                                   UDS_TRANSFER_UPLOAD);
 }
 
 /* ======================================================================== *
@@ -291,16 +266,20 @@ bool uds_svc_request_upload(const uds_request_t *req,
  * ======================================================================== */
 
 bool uds_svc_transfer_data(const uds_request_t *req,
-                            uds_response_t      *rsp,
-                            void                *context)
+                             uds_response_t      *rsp,
+                             void                *context)
 {
-    uint8_t rsp_buf[4];
+    static uint8_t rsp_buf[4];
     (void)context;
 
     /* --- CNC: no active transfer --- */
     if (!g_transfer_ctx.active)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_CONDITIONS_NOT_CORRECT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -313,7 +292,11 @@ bool uds_svc_transfer_data(const uds_request_t *req,
 
     if (bsc != expected_bsc)
     {
-        set_neg_rsp(rsp, req->sid, NRC_WRONG_BLOCK_SEQUENCE_COUNTER, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_WRONG_BLOCK_SEQUENCE_COUNTER;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -326,7 +309,11 @@ bool uds_svc_transfer_data(const uds_request_t *req,
         /* --- IMLOIF: download must have at least 1 data byte --- */
         if (req->data_len == 0u || req->data == NULL)
         {
-            set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+            rsp->sid          = 0x7F;
+            rsp->subfunc_echo = req->sid;
+            rsp_buf[0]        = (uint8_t)NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT;
+            rsp->data         = rsp_buf;
+            rsp->data_len     = 1;
             return true;
         }
 
@@ -341,7 +328,11 @@ bool uds_svc_transfer_data(const uds_request_t *req,
         if ((uint32_t)(g_transfer_ctx.buffer_length + write_len) >
             UDS_TRANSFER_BUFFER_SIZE)
         {
-            set_neg_rsp(rsp, req->sid, NRC_TRANSFER_DATA_SUSPENDED, rsp_buf);
+            rsp->sid          = 0x7F;
+            rsp->subfunc_echo = req->sid;
+            rsp_buf[0]        = (uint8_t)NRC_TRANSFER_DATA_SUSPENDED;
+            rsp->data         = rsp_buf;
+            rsp->data_len     = 1;
             return true;
         }
 
@@ -377,7 +368,11 @@ bool uds_svc_transfer_data(const uds_request_t *req,
         /* --- ROOR: if no data left, reject --- */
         if (read_len == 0u || g_transfer_ctx.buffer_length == 0u)
         {
-            set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+            rsp->sid          = 0x7F;
+            rsp->subfunc_echo = req->sid;
+            rsp_buf[0]        = (uint8_t)NRC_REQUEST_OUT_OF_RANGE;
+            rsp->data         = rsp_buf;
+            rsp->data_len     = 1;
             return true;
         }
 
@@ -390,8 +385,9 @@ bool uds_svc_transfer_data(const uds_request_t *req,
 
         /* Response: [0x76][bsc][data...] using bsc as subfunc_echo
          * and data pointer for the payload bytes. */
-        set_pos_rsp(rsp, TRANSFER_DATA_RSP, bsc,
-                    g_transfer_ctx.buffer, copy_len);
+        (void)uds_set_pos_rsp(rsp, TRANSFER_DATA,
+                              g_transfer_ctx.buffer, copy_len);
+        rsp->subfunc_echo = bsc;
 
         /* --- Advance the buffer position --- */
         uint32_t new_remaining = (copy_len >= g_transfer_ctx.buffer_length)
@@ -422,7 +418,8 @@ bool uds_svc_transfer_data(const uds_request_t *req,
     /* === Download direction: response is [0x76][bsc] === */
     /* The BSC is echoed in the subfunction byte position which aligns
      * with the UDS wire format for TransferData response. */
-    set_pos_rsp(rsp, TRANSFER_DATA_RSP, bsc, NULL, 0);
+    (void)uds_set_pos_rsp(rsp, TRANSFER_DATA, NULL, 0);
+    rsp->subfunc_echo = bsc;
     return true;
 }
 
@@ -434,20 +431,28 @@ bool uds_svc_request_transfer_exit(const uds_request_t *req,
                                     uds_response_t      *rsp,
                                     void                *context)
 {
-    uint8_t rsp_buf[4];
+    static uint8_t rsp_buf[4];
     (void)context;
 
     /* --- CNC: no active transfer --- */
     if (!g_transfer_ctx.active)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_CONDITIONS_NOT_CORRECT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
     /* --- IMLOIF: no additional data expected --- */
     if (req->data_len != 0u)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -460,7 +465,7 @@ bool uds_svc_request_transfer_exit(const uds_request_t *req,
     g_transfer_ctx.buffer_length     = 0u;
 
     /* --- Build positive response (no additional data) --- */
-    set_pos_rsp(rsp, REQUEST_TRANSFER_EXIT_RSP, 0, NULL, 0);
+    (void)uds_set_pos_rsp(rsp, REQUEST_TRANSFER_EXIT, NULL, 0);
     return true;
 }
 
@@ -472,12 +477,16 @@ bool uds_svc_request_file_transfer(const uds_request_t *req,
                                     uds_response_t      *rsp,
                                     void                *context)
 {
-    uint8_t rsp_buf[4];
+    static uint8_t rsp_buf[4];
 
     /* --- CNC: validate context --- */
     if (context == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_CONDITIONS_NOT_CORRECT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -486,14 +495,22 @@ bool uds_svc_request_file_transfer(const uds_request_t *req,
     /* --- CNC: session check --- */
     if (!is_transfer_session_allowed(sctx))
     {
-        set_neg_rsp(rsp, req->sid, NRC_CONDITIONS_NOT_CORRECT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_CONDITIONS_NOT_CORRECT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
     /* --- SAD: security must be unlocked --- */
     if (!uds_security_is_unlocked())
     {
-        set_neg_rsp(rsp, req->sid, NRC_SECURITY_ACCESS_DENIED, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_SECURITY_ACCESS_DENIED;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
@@ -504,19 +521,31 @@ bool uds_svc_request_file_transfer(const uds_request_t *req,
      * 0x03 (replaceFile), 0x04 (readFile) */
     if (subfn < 0x01u || subfn > 0x04u)
     {
-        set_neg_rsp(rsp, req->sid, NRC_SUB_FUNCTION_NOT_SUPPORTED, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_SUB_FUNCTION_NOT_SUPPORTED;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
     /* --- IMLOIF: need at least 1 data byte (filePathLength) --- */
     if (req->data_len < 1u || req->data == NULL)
     {
-        set_neg_rsp(rsp, req->sid, NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT, rsp_buf);
+        rsp->sid          = 0x7F;
+        rsp->subfunc_echo = req->sid;
+        rsp_buf[0]        = (uint8_t)NRC_INCORRECT_MESSAGE_LENGTH_OR_INVALID_FORMAT;
+        rsp->data         = rsp_buf;
+        rsp->data_len     = 1;
         return true;
     }
 
     /* --- Stub: filesystem operations not implemented, return ROOR --- */
-    set_neg_rsp(rsp, req->sid, NRC_REQUEST_OUT_OF_RANGE, rsp_buf);
+    rsp->sid          = 0x7F;
+    rsp->subfunc_echo = req->sid;
+    rsp_buf[0]        = (uint8_t)NRC_REQUEST_OUT_OF_RANGE;
+    rsp->data         = rsp_buf;
+    rsp->data_len     = 1;
     return true;
 }
 

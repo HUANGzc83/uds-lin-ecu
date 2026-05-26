@@ -104,8 +104,9 @@ static void check_neg_rsp(const uds_response_t *rsp,
     TEST_ASSERT_EQUAL_UINT8(0x7F,                 rsp->sid);
     TEST_ASSERT_EQUAL_UINT8(expected_req_sid,     rsp->subfunc_echo);
     TEST_ASSERT_NOT_NULL(rsp->data);
-    TEST_ASSERT_EQUAL_UINT8(1,                    rsp->data_len);
-    TEST_ASSERT_EQUAL_UINT8(expected_nrc,         rsp->data[0]);
+    TEST_ASSERT_EQUAL_UINT8(2,                    rsp->data_len);
+    TEST_ASSERT_EQUAL_UINT8(expected_req_sid,     rsp->data[0]);
+    TEST_ASSERT_EQUAL_UINT8(expected_nrc,         rsp->data[1]);
 }
 
 /* ======================================================================== *
