@@ -102,7 +102,7 @@ Based on ISO 14229-1:2020. 26 standard UDS services listed by functional group.
 
 | Mode | Features |
 |------|----------|
-| 📖 Learn | 10 tabs: Service Browser, NRC Reference, SID Map, Session Management, Message Builder, Knowledge Quiz, LIN Transport Protocol, DTC Status Bytes, Addressing & Response, LIN-UART Physical Layer |
+| 📖 Learn | 9 tabs: Service Browser, NRC Reference, SID Map, Session Management, Message Builder, LIN Transport Protocol, DTC Status Bytes, Addressing & Response, LIN-UART Physical Layer |
 | 🔌 Simulate | Full ECU simulator: send diagnostic requests, real-time message log, 13 preset scenarios, dark/light theme |
 
 Two additional tools:
